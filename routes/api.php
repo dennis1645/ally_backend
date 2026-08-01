@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ProfileController;
 
 // Rute untuk menangkap klik link verifikasi dari email
 // Terlindungi oleh middleware 'signed' untuk memastikan link valid dan tidak dimanipulasi
@@ -24,6 +25,13 @@ Route::middleware('throttle:60,1')->group(function () {
 
 // Protected Routes (Wajib punya token Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
+    // Auth & Keamanan
     Route::post('/logout', [AuthController::class, 'logout']);
-    // Nanti rute beasiswa, profile, dll taruh di sini
+    Route::post('/change-password', [AuthController::class, 'changePassword']); // <-- Route baru untuk ubah password
+    
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::post('/update-profile', [ProfileController::class, 'update']); 
+    
+    // Nanti rute beasiswa, dll taruh di sini ke bawah
 });

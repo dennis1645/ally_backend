@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Auth\Events\PasswordReset; // <-- Tambahan untuk event reset password
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
@@ -239,7 +239,7 @@ class AuthController extends Controller
         ], 500);
     }
 
-    // Reset password function
+    // Reset password function (Lewat email lupa password)
     public function resetPassword(Request $request)
     {
         $request->validate([
@@ -282,6 +282,58 @@ class AuthController extends Controller
             'message' => __($status),
             'data' => []
         ], 400);
+    }
+
+    // Change password function (Lewat profile saat sudah login)
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                'different:current_password', // Password baru tidak boleh sama dengan yang lama
+                PasswordRule::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols(),
+                function ($attribute, $value, $fail) use ($user) {
+                    if ($user->name) {
+                        $nameParts = explode(' ', strtolower($user->name));
+                        foreach ($nameParts as $part) {
+                            if (strlen($part) >= 3 && str_contains(strtolower($value), $part)) {
+                                $fail('Password must not contain parts of your name.');
+                            }
+                        }
+                    }
+                }
+            ],
+        ], [
+            'password.different' => 'The new password must be different from the current password.'
+        ]);
+
+        // Cek apakah password lama sesuai dengan yang di database
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The provided current password does not match our records.',
+                'data' => []
+            ], 400);
+        }
+
+        // Update ke password baru
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Password has been successfully changed.',
+            'data' => []
+        ], 200);
     }
 
     // Logout function
