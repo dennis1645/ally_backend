@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verifikasi Email Berhasil</title>
-<!-- Fallback redirect via meta tag jika JS mati -->
-<meta http-equiv="refresh" content="5;url={{ $redirectUrl }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -230,43 +228,16 @@
     margin:0 0 1.4rem;
   }
 
-  /* ---------- Trail progress ---------- */
-  .trail{
-    position:relative;
-    height:10px;
-    border-radius:999px;
-    background:var(--sand);
-    margin:0 4px 1.5rem;
-    overflow:hidden;
-    border:1px solid var(--sand-deep);
-  }
-  .trail-fill{
-    position:absolute;
-    inset:0;
-    width:0%;
-    border-radius:999px;
-    background:linear-gradient(90deg, var(--sky-mid), #6fb8d8);
-    animation:fill-trail 5s linear forwards;
-  }
-  @keyframes fill-trail{ to{ width:100%; } }
-  .trail-flag{
-    position:absolute;
-    top:50%;
-    left:0%;
-    transform:translate(-50%,-50%);
-    font-size:16px;
-    animation:move-flag 5s linear forwards;
-  }
-  @keyframes move-flag{ to{ left:100%; } }
-
-  .countdown-text{
+  /* ---------- Trail hint ---------- */
+  .trail-hint{
     font-size:0.85rem;
-    color:#9a8567;
-    margin:-1rem 0 1.4rem;
-  }
-  .countdown-text span{
-    font-weight:800;
+    font-weight:700;
     color:var(--brown-deep);
+    background:var(--sand);
+    display:inline-block;
+    padding:6px 14px;
+    border-radius:999px;
+    margin:0 0 1.4rem;
   }
 
   /* ---------- CTA ---------- */
@@ -284,6 +255,11 @@
     border-radius:14px;
     box-shadow:0 10px 22px -10px rgba(76,152,186,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
     transition:transform 0.15s ease, box-shadow 0.15s ease;
+    animation:cta-nudge 2.2s ease-in-out 1.4s infinite;
+  }
+  @keyframes cta-nudge{
+    0%,80%,100%{ transform:translateY(0); }
+    90%{ transform:translateY(-4px); }
   }
   .cta:hover{
     transform:translateY(-2px);
@@ -345,32 +321,14 @@
       Selamat, Penjelajah! Emailmu berhasil diverifikasi. Petualanganmu berlanjut ke basecamp berikutnya.
     </p>
 
-    <div class="trail">
-      <div class="trail-fill"></div>
-      <div class="trail-flag">🚩</div>
-    </div>
-    <p class="countdown-text">Melanjutkan perjalanan dalam <span id="countdown">5</span> detik...</p>
+    <p class="trail-hint">🚩 Basecamp berikutnya sudah menunggu</p>
 
     <a href="{{ $redirectUrl }}" class="cta">
       Lanjutkan Perjalanan
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </a>
 
-    <p class="footnote">Tidak dialihkan otomatis? Ketuk tombol di atas.</p>
+    <p class="footnote">Halaman ini tidak akan mengalihkanmu otomatis — klik tombol di atas untuk melanjutkan.</p>
   </main>
-
-  <script>
-    let timeLeft = 5;
-    const countdownElement = document.getElementById('countdown');
-    const redirectUrl = "{!! $redirectUrl !!}";
-    const timer = setInterval(() => {
-      timeLeft--;
-      countdownElement.textContent = Math.max(timeLeft, 0);
-      if (timeLeft <= 0) {
-        clearInterval(timer);
-        window.location.href = redirectUrl;
-      }
-    }, 1000);
-  </script>
 </body>
 </html>
