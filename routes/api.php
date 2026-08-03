@@ -16,6 +16,7 @@ use App\Http\Controllers\MentorPortalController;
 use App\Http\Controllers\MentorBookingController;
 use App\Http\Controllers\ShopController; 
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\AdminShopItemController; // Tambahan Controller Admin Shop
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -78,8 +79,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Shop & Monetization (Premium & Tokens)
     Route::prefix('shop')->group(function () {
-        Route::get('/items', [ShopController::class, 'index']);      
-        Route::post('/checkout', [ShopController::class, 'checkout']); 
+        Route::get('/items', [ShopController::class, 'index']);       // Melihat daftar paket (Premium / Token)
+        Route::post('/checkout', [ShopController::class, 'checkout']); // Membeli paket dan mendapatkan Snap Token
     });
 
     // Transaction History & Status
@@ -91,12 +92,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // AI Mentor Chatbot
     Route::prefix('ai-mentor')->group(function () {
         Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
-    });
-
-    // Shop & Monetization (Premium & Tokens)
-    Route::prefix('shop')->group(function () {
-        Route::get('/items', [ShopController::class, 'index']);       // Melihat daftar paket (Premium / Token)
-        Route::post('/checkout', [ShopController::class, 'checkout']); // Membeli paket dan mendapatkan Snap Token
     });
 
     // Mentor Booking
@@ -159,6 +154,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // Rute dengan parameter {id}
         Route::put('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'update']);
         Route::delete('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'destroy']);
+
+        // --- TAMBAHAN: Shop Item Management ---
+        Route::get('/shop-items', [AdminShopItemController::class, 'index']);
+        Route::post('/shop-items', [AdminShopItemController::class, 'store']);
+        Route::get('/shop-items/{id}', [AdminShopItemController::class, 'show']);
+        Route::put('/shop-items/{id}', [AdminShopItemController::class, 'update']);
+        Route::delete('/shop-items/{id}', [AdminShopItemController::class, 'destroy']);
         
     });
 });
