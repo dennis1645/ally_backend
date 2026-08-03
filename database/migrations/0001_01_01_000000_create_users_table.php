@@ -19,9 +19,15 @@ return new class extends Migration
             
             // Atribut Khusus Sistem Beasiswa
             $table->enum('role', ['user', 'mentor', 'admin'])->default('user');
-            $table->boolean('is_premium')->default(false); // Pindah ke sini, hapus ->after()
+            $table->boolean('is_premium')->default(false); 
             $table->enum('status', ['active', 'suspended'])->default('active');
             $table->integer('readiness_score')->nullable(); 
+            
+            // Saldo token untuk booking mentor (Hapus ->after)
+            $table->integer('token_balance')->default(0);
+            
+            // Batas waktu masa aktif premium (Berlangganan) (Hapus ->after)
+            $table->timestamp('premium_until')->nullable();
             
             // Profil & Portofolio (Berguna untuk Mentor & Mentee)
             $table->string('profile_picture_url')->nullable(); 

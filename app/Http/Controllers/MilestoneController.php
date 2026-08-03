@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Scholarship;
 use App\Models\UserMilestone;
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
 use App\Services\AITimelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class MilestoneController extends Controller
 {
@@ -17,6 +22,46 @@ class MilestoneController extends Controller
     public function __construct(AITimelineService $aiService)
     {
         $this->aiService = $aiService;
+
+        // Konfigurasi Midtrans
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY', 'SB-Mid-server-zPZzeYWIuU8ckXT3gwASJ31c');
+        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
+    }
+
+    /**
+     * GET: Mengambil daftar semua milestone / task timeline milik user
+     */
+    public function getTimeline(Request $request)
+    {
+        $request->validate([
+            'scholarship_id' => 'required|exists:scholarships,id',
+        ]);
+
+        $user = Auth::user();
+        $scholarshipId = $request->scholarship_id;
+
+        $milestones = UserMilestone::where('user_id', $user->id)
+            ->where('scholarship_id', $scholarshipId)
+            ->orderBy('step_order', 'asc')
+            ->get();
+
+        if ($milestones->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Belum ada timeline yang digenerate untuk beasiswa ini.'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Berhasil mengambil daftar timeline milestone.',
+            'data' => [
+                'is_user_premium' => (bool) $user->is_premium,
+                'milestones' => $milestones
+            ]
+        ], 200);
     }
 
     public function generateTimeline(Request $request)
@@ -87,7 +132,7 @@ class MilestoneController extends Controller
                     'task_name'       => $task['task_name'],
                     'description'     => $task['description'] ?? null,
                     'step_order'      => $step_order,
-                    'is_premium'      => $step_order > 3 ? true : false, 
+                    'is_premium'      => $task['is_premium'] ?? ($step_order > 3 ? true : false), 
                     'target_deadline' => Carbon::parse($task['target_deadline'])->format('Y-m-d'),
                     'status'          => 'pending',
                     'source'          => 'system',
@@ -118,7 +163,62 @@ class MilestoneController extends Controller
     }
 
     /**
-     * FITUR BARU: User mengubah status task menjadi in_progress (Tanpa menambah XP)
+     * Helper untuk membuat transaksi Midtrans Premium Unlock
+     */
+    private function createPremiumUnlockTransaction($user)
+    {
+        $orderId = 'PREMIUM-UNLOCK-' . time() . '-' . rand(100, 999);
+        $grossAmount = 150000;
+
+        $transaction = Transaction::create([
+            'user_id' => $user->id,
+            'midtrans_order_id' => $orderId,
+            'transaction_type' => 'premium_unlock',
+            'gross_amount' => $grossAmount,
+            'payment_status' => 'pending',
+        ]);
+
+        $transactionDetail = TransactionDetail::create([
+            'transaction_id' => $transaction->id,
+            'shop_item_id' => null,
+            'price' => $grossAmount,
+        ]);
+
+        $params = [
+            'transaction_details' => [
+                'order_id' => $orderId,
+                'gross_amount' => (int) $grossAmount,
+            ],
+            'customer_details' => [
+                'first_name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone_number ?? '08123456789',
+            ],
+            'item_details' => [
+                [
+                    'id' => 'PREMIUM-UPGRADE',
+                    'price' => (int) $grossAmount,
+                    'quantity' => 1,
+                    'name' => 'Upgrade Akun Premium & Unlock Milestone Eksklusif',
+                ]
+            ]
+        ];
+
+        $paymentUrl = Snap::createTransaction($params)->redirect_url;
+
+        $transaction->update([
+            'payment_url' => $paymentUrl
+        ]);
+
+        return [
+            'order_id' => $orderId,
+            'gross_amount' => $grossAmount,
+            'payment_url' => $paymentUrl
+        ];
+    }
+
+    /**
+     * User mengubah status task menjadi in_progress
      */
     public function startTask(Request $request, $id)
     {
@@ -135,12 +235,22 @@ class MilestoneController extends Controller
             ], 404);
         }
 
-        // Validasi Freemium
         if ($milestone->is_premium && !$user->is_premium) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Task ini terkunci khusus member premium. Silakan upgrade akun terlebih dahulu.'
-            ], 403);
+            try {
+                $paymentInfo = $this->createPremiumUnlockTransaction($user);
+                return response()->json([
+                    'status' => 'payment_required',
+                    'message' => 'Task ini terkunci khusus member premium. Silakan selesaikan pembayaran untuk mengaktifkannya.',
+                    'data' => $paymentInfo
+                ], 402);
+            } catch (\Exception $e) {
+                Log::error('Midtrans Premium Unlock Error: ' . $e->getMessage());
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal membuat transaksi pembayaran premium.',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
         }
 
         if ($milestone->status === 'completed') {
@@ -172,7 +282,7 @@ class MilestoneController extends Controller
     }
 
     /**
-     * User menandai task milestone selesai (XP bertambah & Validasi Freemium)
+     * User menandai task milestone selesai
      */
     public function completeTask(Request $request, $id)
     {
@@ -190,10 +300,21 @@ class MilestoneController extends Controller
         }
 
         if ($milestone->is_premium && !$user->is_premium) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Task ini terkunci khusus member premium. Silakan upgrade akun terlebih dahulu untuk menyelesaikannya.'
-            ], 403);
+            try {
+                $paymentInfo = $this->createPremiumUnlockTransaction($user);
+                return response()->json([
+                    'status' => 'payment_required',
+                    'message' => 'Task ini terkunci khusus member premium. Silakan selesaikan pembayaran untuk mengaktifkannya.',
+                    'data' => $paymentInfo
+                ], 402);
+            } catch (\Exception $e) {
+                Log::error('Midtrans Premium Unlock Error: ' . $e->getMessage());
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal membuat transaksi pembayaran premium.',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
         }
 
         if ($milestone->status === 'completed') {
@@ -205,12 +326,10 @@ class MilestoneController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Ubah status task menjadi completed
             $milestone->status = 'completed';
             $milestone->completed_at = now();
             $milestone->save();
 
-            // 2. Tambahkan XP reward ke akun user (Hanya saat completed)
             $user->xp_points += $milestone->xp_reward;
             $user->save();
 

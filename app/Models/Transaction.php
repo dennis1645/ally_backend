@@ -12,7 +12,7 @@ class Transaction extends Model
     protected $fillable = [
         'user_id',
         'midtrans_order_id',
-        'transaction_type', // mentor_booking, premium_unlock, shop_purchase
+        'transaction_type', // Enum baru: subscription, token_topup, shop_purchase
         'gross_amount',
         'payment_status',
         'payment_method',

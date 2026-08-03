@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
 
 class UserSeeder extends Seeder
 {
@@ -67,6 +68,8 @@ class UserSeeder extends Seeder
             'readiness_score'   => 45,
             'xp_points'         => 120,
             'is_premium'        => false,
+            'token_balance'     => 0,
+            'premium_until'     => null,
         ]);
 
         User::create([
@@ -79,7 +82,9 @@ class UserSeeder extends Seeder
             'email_verified_at' => now(),
             'readiness_score'   => 80,
             'xp_points'         => 450,
-            'is_premium'        => true, // Contoh akun mentee yang sudah bayar premium
+            'is_premium'        => true, // Akun mentee yang sudah bayar premium
+            'token_balance'     => 3,    // Mendapatkan 3 token mentor bawaan langganan
+            'premium_until'     => Carbon::now()->addYear(), // Aktif selama 1 tahun
         ]);
     }
 }

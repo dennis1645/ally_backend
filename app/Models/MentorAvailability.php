@@ -17,10 +17,13 @@ class MentorAvailability extends Model
         'is_booked',
     ];
 
-    protected $casts = [
-        'available_date' => 'date',
-        'is_booked' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'available_date' => 'date',
+            'is_booked'      => 'boolean',
+        ];
+    }
 
     public function mentor()
     {

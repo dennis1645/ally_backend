@@ -28,10 +28,4 @@ class TransactionDetail extends Model
     {
         return $this->belongsTo(ShopItem::class);
     }
-
-    // Jika detail transaksi ini dipakai untuk bayar booking mentor
-    public function consultationBooking()
-    {
-        return $this->hasOne(ConsultationBooking::class);
-    }
 }

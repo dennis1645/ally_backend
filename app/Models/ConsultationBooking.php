@@ -13,10 +13,17 @@ class ConsultationBooking extends Model
         'mentee_id',
         'mentor_id',
         'availability_id',
-        'transaction_detail_id',
+        'token_cost', // Menggantikan transaction_detail_id
         'session_status',
         'meeting_link',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'token_cost' => 'integer',
+        ];
+    }
 
     public function mentee()
     {
@@ -31,11 +38,6 @@ class ConsultationBooking extends Model
     public function availability()
     {
         return $this->belongsTo(MentorAvailability::class, 'availability_id');
-    }
-
-    public function transactionDetail()
-    {
-        return $this->belongsTo(TransactionDetail::class, 'transaction_detail_id');
     }
 
     public function actionPlans()

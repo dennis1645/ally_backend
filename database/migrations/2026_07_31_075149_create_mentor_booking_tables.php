@@ -28,15 +28,22 @@ return new class extends Migration
         });
 
         // ==========================================
-        // 2. SHOP & BUNDLE ITEMS
+        // 2. SHOP & BUNDLE ITEMS (SUBSCRIPTION & TOKEN PACKAGES)
         // ==========================================
         Schema::create('shop_items', function (Blueprint $table) {
             $table->id();
             $table->string('name'); 
-            $table->enum('item_type', ['practice_bundle', 'gamification_item', 'premium_unlock', 'other']); // Ditambah 'premium_unlock'
+            // Tipe item diubah untuk mendukung Langganan & Top-Up Token
+            $table->enum('item_type', ['subscription', 'token_package', 'practice_bundle', 'gamification_item', 'other']); 
             $table->text('description')->nullable();
+            
             $table->decimal('price_rupiah', 12, 2)->default(0); 
-            $table->integer('price_xp')->default(0); 
+            $table->integer('price_xp')->default(0); // Jika bisa dibeli pakai XP
+            
+            // PENAMBAHAN UNTUK SISTEM TOKEN & LANGGANAN
+            $table->integer('token_reward')->default(0)->comment('Jumlah token mentor yang didapat (misal: 3)');
+            $table->integer('duration_days')->nullable()->comment('Durasi premium dalam hari (misal: 365 untuk 1 tahun)');
+            
             $table->integer('stock_quantity')->default(0); 
             $table->string('image_url')->nullable();
             $table->boolean('is_active')->default(true);
@@ -51,8 +58,8 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('midtrans_order_id')->unique();
             
-            // PENAMBAHAN UNTUK MEMBEDAKAN TIPE PEMBAYARAN
-            $table->enum('transaction_type', ['mentor_booking', 'premium_unlock', 'shop_purchase'])->default('mentor_booking');
+            // Tipe transaksi difokuskan pada pembelian dari shop (Langganan / Top Up)
+            $table->enum('transaction_type', ['subscription', 'token_topup', 'shop_purchase'])->default('shop_purchase');
             
             $table->decimal('gross_amount', 12, 2);
             $table->enum('payment_status', ['pending', 'success', 'expired', 'failed'])->default('pending');
@@ -67,9 +74,7 @@ return new class extends Migration
         Schema::create('transaction_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('transaction_id')->constrained('transactions')->cascadeOnDelete();
-            
             $table->foreignId('shop_item_id')->nullable()->constrained('shop_items')->cascadeOnDelete();
-            
             $table->decimal('price', 12, 2);
             $table->timestamps();
         });
@@ -93,7 +98,8 @@ return new class extends Migration
             $table->foreignId('mentor_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('availability_id')->constrained('mentor_availabilities')->cascadeOnDelete();
             
-            $table->foreignId('transaction_detail_id')->nullable()->constrained('transaction_details')->cascadeOnDelete();
+            // Transaksi Midtrans dilepas, diganti dengan Token Cost
+            $table->integer('token_cost')->default(1)->comment('Berapa token yang dihabiskan untuk sesi ini');
             
             $table->enum('session_status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
             $table->string('meeting_link')->nullable(); 
@@ -116,11 +122,9 @@ return new class extends Migration
         Schema::dropIfExists('action_plans');
         Schema::dropIfExists('consultation_bookings');
         Schema::dropIfExists('mentor_availabilities');
-        
         Schema::dropIfExists('transaction_details');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('shop_items');
-        
         Schema::dropIfExists('user_badges');
         Schema::dropIfExists('badges');
     }

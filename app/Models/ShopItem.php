@@ -15,6 +15,8 @@ class ShopItem extends Model
         'description',
         'price_rupiah',
         'price_xp',
+        'token_reward',     // Ditambahkan
+        'duration_days',    // Ditambahkan
         'stock_quantity',
         'image_url',
         'is_active',
@@ -25,6 +27,8 @@ class ShopItem extends Model
         return [
             'price_rupiah' => 'decimal:2',
             'price_xp' => 'integer',
+            'token_reward' => 'integer',    // Ditambahkan
+            'duration_days' => 'integer',   // Ditambahkan
             'stock_quantity' => 'integer',
             'is_active' => 'boolean',
         ];

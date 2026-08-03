@@ -21,6 +21,8 @@ use Laravel\Sanctum\HasApiTokens;
     'role', 
     'status', 
     'readiness_score', 
+    'token_balance',       // Ditambahkan
+    'premium_until',       // Ditambahkan
     'profile_picture_url', 
     'headline', 
     'bio', 
@@ -37,7 +39,6 @@ use Laravel\Sanctum\HasApiTokens;
     'google_id',  // Best practice: Menyembunyikan ID OAuth dari response JSON API
     'linkedin_id' 
 ])]
-// PERBAIKAN: Menambahkan "implements MustVerifyEmail" di sini
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
@@ -54,6 +55,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'readiness_score' => 'integer',
+            'token_balance' => 'integer',    // Ditambahkan
+            'premium_until' => 'datetime',   // Ditambahkan
             'xp_points' => 'integer',
             'current_streak' => 'integer',
             'longest_streak' => 'integer',
@@ -137,18 +140,16 @@ class User extends Authenticatable implements MustVerifyEmail
     // OVERRIDE EMAIL NOTIFICATIONS (CUSTOM)
     // ==========================================
 
-    // Override untuk email verifikasi
     public function sendEmailVerificationNotification()
     {
         $this->notify(new \App\Notifications\CustomVerifyEmail);
     }
 
-    // Override untuk email reset password
     public function sendPasswordResetNotification($token)
     {
         $this->notify(new \App\Notifications\CustomResetPassword($token));
     }
-    // Relasi ke riwayat hasil asesmen diagnostik
+
     public function diagnosticAssessments()
     {
         return $this->hasMany(DiagnosticAssessment::class);

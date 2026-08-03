@@ -17,10 +17,13 @@ class ActionPlan extends Model
         'is_completed',
     ];
 
-    protected $casts = [
-        'deadline' => 'date',
-        'is_completed' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'deadline'     => 'date',
+            'is_completed' => 'boolean',
+        ];
+    }
 
     public function booking()
     {

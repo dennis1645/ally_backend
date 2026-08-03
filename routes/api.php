@@ -12,6 +12,10 @@ use App\Http\Controllers\AdminDiagnosticController;
 use App\Http\Controllers\UserDiagnosticController; 
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\AIMentorChatController;
+use App\Http\Controllers\MentorPortalController;
+use App\Http\Controllers\MentorBookingController;
+use App\Http\Controllers\ShopController; 
+use App\Http\Controllers\TransactionController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -24,6 +28,9 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset'); 
+
+    // Midtrans Webhook Callback (Publik, diakses langsung oleh server Midtrans)
+    Route::post('/midtrans/webhook', [ShopController::class, 'webhook']);
 });
 
 // Protected Routes (Requires Login)
@@ -63,18 +70,57 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User Milestone & AI Timeline Routes
     Route::prefix('milestones')->group(function () {
+        Route::get('/', [MilestoneController::class, 'getTimeline']);
         Route::post('/generate', [MilestoneController::class, 'generateTimeline']);
-        Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); // Ubah status jadi in_progress
-        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);     // Selesaikan task & tambah XP
+        Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); 
+        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);     
     });
 
+    // Shop & Monetization (Premium & Tokens)
+    Route::prefix('shop')->group(function () {
+        Route::get('/items', [ShopController::class, 'index']);      
+        Route::post('/checkout', [ShopController::class, 'checkout']); 
+    });
+
+    // Transaction History & Status
+    Route::prefix('transactions')->group(function () {
+        Route::get('/', [TransactionController::class, 'index']); // Riwayat semua transaksi
+        Route::get('/{identifier}', [TransactionController::class, 'show']); // Cek status 1 transaksi
+    });
+
+    // AI Mentor Chatbot
     Route::prefix('ai-mentor')->group(function () {
-    Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
-});
+        Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
+    });
+
+    // Shop & Monetization (Premium & Tokens)
+    Route::prefix('shop')->group(function () {
+        Route::get('/items', [ShopController::class, 'index']);       // Melihat daftar paket (Premium / Token)
+        Route::post('/checkout', [ShopController::class, 'checkout']); // Membeli paket dan mendapatkan Snap Token
+    });
+
+    // Mentor Booking
+    Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
     
     // MENTOR MODULE (Mentor Only)
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
-        // Mentor Dashboard & Scheduling routes will be added here
+        // Multi-Mentee Dashboard
+        Route::get('/mentees', [MentorPortalController::class, 'getMenteeList']);
+        
+        // Pre-Session Dossier & Pre-Read
+        Route::get('/dossier/{bookingId}', [MentorPortalController::class, 'getPreSessionDossier']);
+        
+        // Calendar & Availability Management
+        Route::get('/availabilities', [MentorPortalController::class, 'getMyAvailabilities']);
+        Route::post('/availabilities', [MentorPortalController::class, 'storeAvailability']);
+        
+        // Consultation Booking Actions (Confirm, Reject, Reschedule)
+        Route::patch('/bookings/{bookingId}/confirm', [MentorPortalController::class, 'confirmBooking']);
+        Route::patch('/bookings/{bookingId}/reject', [MentorPortalController::class, 'rejectBooking']);
+        Route::patch('/bookings/{bookingId}/reschedule', [MentorPortalController::class, 'rescheduleBooking']);
+
+        // Custom Action Plan Generation (Pasca-Konsultasi)
+        Route::post('/bookings/{bookingId}/action-plans', [MentorPortalController::class, 'storeActionPlan']);
     });
 
     // ADMIN MODULE (Admin Only)
