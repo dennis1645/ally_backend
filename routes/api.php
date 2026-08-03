@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UniversityController;
 use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\DailyJournalController;
+use App\Http\Controllers\DocumentVaultController; 
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -37,9 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/scholarships', [ScholarshipController::class, 'index']);
     Route::get('/scholarships/{id}', [ScholarshipController::class, 'show']);
 
-    // ==========================================
-    // USER MODULE (Productivity & Journaling)
-    // ==========================================
+    // USER MODULE (Productivity, Journaling & Vault)
     Route::prefix('journals')->group(function () {
         Route::get('/', [DailyJournalController::class, 'index']);
         Route::post('/', [DailyJournalController::class, 'store']); // Create or Update today's journal
@@ -48,16 +47,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [DailyJournalController::class, 'destroy']);
     });
     
-    // ==========================================
+    // Document Vault (Brankas Penyimpanan Terenkripsi)
+    // Menghasilkan route: GET /vault, POST /vault, GET /vault/{id}, DELETE /vault/{id}
+    Route::apiResource('vault', DocumentVaultController::class)->except(['update']);
+    
     // MENTOR MODULE (Mentor Only)
-    // ==========================================
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
         // Mentor Dashboard & Scheduling routes will be added here
     });
 
-    // ==========================================
     // ADMIN MODULE (Admin Only)
-    // ==========================================
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         
         // User Management
