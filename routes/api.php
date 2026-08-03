@@ -8,7 +8,8 @@ use App\Http\Controllers\UniversityController;
 use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\DailyJournalController;
 use App\Http\Controllers\DocumentVaultController;
-use App\Http\Controllers\AdminDiagnosticController; 
+use App\Http\Controllers\AdminDiagnosticController;
+use App\Http\Controllers\UserDiagnosticController; // <-- Import controller baru untuk User
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -51,6 +52,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Document Vault (Brankas Penyimpanan Terenkripsi)
     // Menghasilkan route: GET /vault, POST /vault, GET /vault/{id}, DELETE /vault/{id}
     Route::apiResource('vault', DocumentVaultController::class)->except(['update']);
+
+    // Diagnostic Assessment (User Side)
+    Route::prefix('diagnostic')->group(function () {
+        Route::get('/questions', [UserDiagnosticController::class, 'getQuestions']);
+        Route::post('/submit', [UserDiagnosticController::class, 'submitAssessment']);
+        Route::get('/my-result', [UserDiagnosticController::class, 'getMyAssessment']);
+    });
     
     // MENTOR MODULE (Mentor Only)
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
@@ -87,7 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/diagnostic-questions/import', [AdminDiagnosticController::class, 'importExcel']);
         Route::post('/diagnostic-questions', [AdminDiagnosticController::class, 'store']);
         
-        //  Hapus semua data (Di atas rute {id} agar tidak terbaca sebagai parameter ID)
+        // Hapus semua data (Di atas rute {id} agar tidak terbaca sebagai parameter ID)
         Route::delete('/diagnostic-questions/clear-all', [AdminDiagnosticController::class, 'destroyAll']); 
         
         // Rute dengan parameter {id}
