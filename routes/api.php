@@ -7,7 +7,8 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UniversityController;
 use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\DailyJournalController;
-use App\Http\Controllers\DocumentVaultController; 
+use App\Http\Controllers\DocumentVaultController;
+use App\Http\Controllers\AdminDiagnosticController; 
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -80,6 +81,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/update-scholarship/{id}', [ScholarshipController::class, 'update']); 
         Route::delete('/delete-scholarship/{id}', [ScholarshipController::class, 'destroy']); 
         Route::post('/restore-scholarship/{id}', [ScholarshipController::class, 'restore']);
+        
+        // Diagnostic Assessment Management (Initial Assessment)
+        Route::get('/diagnostic-questions', [AdminDiagnosticController::class, 'index']);
+        Route::post('/diagnostic-questions/import', [AdminDiagnosticController::class, 'importExcel']);
+        Route::post('/diagnostic-questions', [AdminDiagnosticController::class, 'store']);
+        
+        //  Hapus semua data (Di atas rute {id} agar tidak terbaca sebagai parameter ID)
+        Route::delete('/diagnostic-questions/clear-all', [AdminDiagnosticController::class, 'destroyAll']); 
+        
+        // Rute dengan parameter {id}
+        Route::put('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'update']);
+        Route::delete('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'destroy']);
         
     });
 });

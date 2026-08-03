@@ -148,4 +148,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $this->notify(new \App\Notifications\CustomResetPassword($token));
     }
+    // Relasi ke riwayat hasil asesmen diagnostik
+    public function diagnosticAssessments()
+    {
+        return $this->hasMany(DiagnosticAssessment::class);
+    }
 }
