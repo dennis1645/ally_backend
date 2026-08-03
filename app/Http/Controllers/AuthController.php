@@ -102,10 +102,12 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // Verify Email function
-    public function verifyEmail(Request $request, $id, $hash)
+   public function verifyEmail(Request $request, $id, $hash)
     {
         $user = User::find($id);
+        
+        // Ambil URL dari .env, berikan fallback jika kosong
+        $redirectUrl = env('FRONTEND_URL', 'http://localhost:5173/onboarding/profile');
 
         if (!$user) {
             return response()->json([
@@ -123,23 +125,23 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Jika email sudah pernah diverifikasi sebelumnya
         if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Email has already been verified.',
-                'data' => []
-            ], 200);
+            return view('auth.verify-success', [
+                'message' => 'Email sudah terverifikasi sebelumnya.',
+                'redirectUrl' => $redirectUrl
+            ]);
         }
 
+        // Jika berhasil verifikasi email baru
         if ($user->markEmailAsVerified()) {
-            event(new Verified($user));
+            event(new \Illuminate\Auth\Events\Verified($user));
         }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Email successfully verified!',
-            'data' => []
-        ], 200);
+        return view('auth.verify-success', [
+            'message' => 'Email berhasil diverifikasi!',
+            'redirectUrl' => $redirectUrl
+        ]);
     }
 
     // Login function

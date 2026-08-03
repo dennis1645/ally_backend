@@ -16,7 +16,7 @@ use App\Http\Controllers\MentorPortalController;
 use App\Http\Controllers\MentorBookingController;
 use App\Http\Controllers\ShopController; 
 use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\AdminShopItemController; // Tambahan Controller Admin Shop
+use App\Http\Controllers\AdminShopItemController; 
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
