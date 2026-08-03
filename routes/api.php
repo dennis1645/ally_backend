@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UniversityController;
+use App\Http\Controllers\ScholarshipController;
 
 // Verifikasi email
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -27,15 +28,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/update-profile', [ProfileController::class, 'update']); 
     
-    // ==========================================
-    // UNIVERSITY MODULE (Bisa diakses Admin & User)
-    // ==========================================
+    // University Module
     Route::get('/universities', [UniversityController::class, 'index']);
     Route::get('/universities/{id}', [UniversityController::class, 'show']);
     
-    // ==========================================
-    // ADMIN MODULE (Hanya Admin)
-    // ==========================================
+    // Scholarship Module
+    Route::get('/scholarships', [ScholarshipController::class, 'index']);
+    Route::get('/scholarships/{id}', [ScholarshipController::class, 'show']);
+    
+    // Admin Module
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         
         // User Management
@@ -48,12 +49,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/delete-user/{id}', [AdminController::class, 'destroy']); 
         Route::post('/restore-user/{id}', [AdminController::class, 'restore']);
         
-        // University Management (CRUD)
+        // University Management
         Route::post('/create-university', [UniversityController::class, 'store']); 
-        // Menggunakan POST karena upload file (gambar) via API tidak terbaca di PUT/PATCH
         Route::post('/update-university/{id}', [UniversityController::class, 'update']); 
         Route::delete('/delete-university/{id}', [UniversityController::class, 'destroy']); 
         Route::post('/restore-university/{id}', [UniversityController::class, 'restore']);
+        
+        // Scholarship Management
+        Route::post('/create-scholarship', [ScholarshipController::class, 'store']); 
+        Route::post('/update-scholarship/{id}', [ScholarshipController::class, 'update']); 
+        Route::delete('/delete-scholarship/{id}', [ScholarshipController::class, 'destroy']); 
+        Route::post('/restore-scholarship/{id}', [ScholarshipController::class, 'restore']);
         
     });
 });
