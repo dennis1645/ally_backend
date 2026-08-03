@@ -9,7 +9,9 @@ use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\DailyJournalController;
 use App\Http\Controllers\DocumentVaultController;
 use App\Http\Controllers\AdminDiagnosticController;
-use App\Http\Controllers\UserDiagnosticController; // <-- Import controller baru untuk User
+use App\Http\Controllers\UserDiagnosticController; 
+use App\Http\Controllers\MilestoneController;
+use App\Http\Controllers\AIMentorChatController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -50,7 +52,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
     // Document Vault (Brankas Penyimpanan Terenkripsi)
-    // Menghasilkan route: GET /vault, POST /vault, GET /vault/{id}, DELETE /vault/{id}
     Route::apiResource('vault', DocumentVaultController::class)->except(['update']);
 
     // Diagnostic Assessment (User Side)
@@ -59,6 +60,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/submit', [UserDiagnosticController::class, 'submitAssessment']);
         Route::get('/my-result', [UserDiagnosticController::class, 'getMyAssessment']);
     });
+
+    // User Milestone & AI Timeline Routes
+    Route::prefix('milestones')->group(function () {
+        Route::post('/generate', [MilestoneController::class, 'generateTimeline']);
+        Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); // Ubah status jadi in_progress
+        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);     // Selesaikan task & tambah XP
+    });
+
+    Route::prefix('ai-mentor')->group(function () {
+    Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
+});
     
     // MENTOR MODULE (Mentor Only)
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
