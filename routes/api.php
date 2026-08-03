@@ -6,8 +6,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UniversityController;
 use App\Http\Controllers\ScholarshipController;
+use App\Http\Controllers\DailyJournalController;
 
-// Verifikasi email
+// Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
@@ -20,7 +21,7 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.reset'); 
 });
 
-// Protected Routes (Wajib Login)
+// Protected Routes (Requires Login)
 Route::middleware('auth:sanctum')->group(function () {
     // Auth & Profile
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -35,8 +36,28 @@ Route::middleware('auth:sanctum')->group(function () {
     // Scholarship Module
     Route::get('/scholarships', [ScholarshipController::class, 'index']);
     Route::get('/scholarships/{id}', [ScholarshipController::class, 'show']);
+
+    // ==========================================
+    // USER MODULE (Productivity & Journaling)
+    // ==========================================
+    Route::prefix('journals')->group(function () {
+        Route::get('/', [DailyJournalController::class, 'index']);
+        Route::post('/', [DailyJournalController::class, 'store']); // Create or Update today's journal
+        Route::get('/{id}', [DailyJournalController::class, 'show']);
+        Route::put('/{id}', [DailyJournalController::class, 'update']);
+        Route::delete('/{id}', [DailyJournalController::class, 'destroy']);
+    });
     
-    // Admin Module
+    // ==========================================
+    // MENTOR MODULE (Mentor Only)
+    // ==========================================
+    Route::middleware('role:mentor')->prefix('mentor')->group(function () {
+        // Mentor Dashboard & Scheduling routes will be added here
+    });
+
+    // ==========================================
+    // ADMIN MODULE (Admin Only)
+    // ==========================================
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         
         // User Management
