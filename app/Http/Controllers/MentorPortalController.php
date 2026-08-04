@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL; 
 use App\Models\User;
 use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
@@ -33,7 +34,7 @@ class MentorPortalController extends Controller
             ->unique();
 
         $mentees = User::whereIn('id', $menteeIds)
-            ->with(['milestones', 'documents'])
+            ->with(['milestones', 'documents', 'scholarships']) 
             ->get()
             ->map(function ($mentee) {
                 $totalTasks = $mentee->milestones->count();
@@ -45,6 +46,8 @@ class MentorPortalController extends Controller
                     'name' => $mentee->name,
                     'email' => $mentee->email,
                     'phone_number' => $mentee->phone_number,
+                    'target_scholarship' => $mentee->scholarships->first()->name ?? 'Belum ditentukan',
+                    'target_country' => $mentee->scholarships->first()->country ?? 'Belum ditentukan',
                     'readiness_score' => $mentee->readiness_score,
                     'total_xp' => $mentee->xp_points,
                     'progress_summary' => [
@@ -64,7 +67,7 @@ class MentorPortalController extends Controller
     }
 
     /**
-     * 2. PRE-SESSION DOSSIER & PRE-READ
+     * 2. PRE-SESSION DOSSIER & PRE-READ (Detail Lengkap Mentee & Meeting Link)
      */
     public function getPreSessionDossier($bookingId)
     {
@@ -77,7 +80,13 @@ class MentorPortalController extends Controller
             ], 403);
         }
 
-        $booking = ConsultationBooking::with(['mentee.milestones', 'mentee.documents', 'availability'])
+        $booking = ConsultationBooking::with([
+                'mentee.milestones', 
+                'mentee.documents', 
+                'mentee.scholarships',
+                'mentee.diagnosticAssessment', 
+                'availability'
+            ])
             ->where('id', $bookingId)
             ->where('mentor_id', $mentor->id)
             ->first();
@@ -93,37 +102,56 @@ class MentorPortalController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Pre-session dossier berhasil dimuat.',
+            'message' => 'Pre-session dossier & detail mentee berhasil dimuat.',
             'data' => [
                 'booking_id' => $booking->id,
                 'session_status' => $booking->session_status,
-                'meeting_link' => $booking->meeting_link,
+                'meeting_link' => $booking->meeting_link ?? 'Belum ada link meeting (Belum dikonfirmasi)',
+                'token_cost' => $booking->token_cost,
                 'scheduled_at' => [
-                    'date' => $booking->availability->available_date,
-                    'start_time' => $booking->availability->start_time,
-                    'end_time' => $booking->availability->end_time,
+                    'date' => $booking->availability->available_date ?? null,
+                    'start_time' => $booking->availability->start_time ?? null,
+                    'end_time' => $booking->availability->end_time ?? null,
                 ],
                 'mentee_profile' => [
                     'id' => $mentee->id,
                     'name' => $mentee->name,
                     'email' => $mentee->email,
+                    'phone_number' => $mentee->phone_number,
+                    'gender' => $mentee->gender,
                     'headline' => $mentee->headline,
                     'bio' => $mentee->bio,
+                    'profile_picture_url' => $mentee->profile_picture_url,
                     'readiness_score' => $mentee->readiness_score,
+                    'xp_points' => $mentee->xp_points,
+                    'target_scholarship' => $mentee->scholarships->first()->name ?? 'Belum ditentukan',
+                    'target_country' => $mentee->scholarships->first()->country ?? 'Belum ditentukan',
                 ],
+                'assessment_gap_analysis' => $mentee->diagnosticAssessment ? [
+                    'overall_score' => $mentee->diagnosticAssessment->overall_score ?? 0,
+                    'academic_score' => $mentee->diagnosticAssessment->academic_score ?? 0,
+                    'language_score' => $mentee->diagnosticAssessment->language_score ?? 0,
+                    'weaknesses_mapping' => $mentee->diagnosticAssessment->weaknesses_mapping ?? [],
+                    'strengths_mapping' => $mentee->diagnosticAssessment->strengths_mapping ?? [],
+                ] : null,
                 'milestones_progress' => $mentee->milestones->map(function ($m) {
                     return [
                         'task_name' => $m->task_name,
+                        'description' => $m->description,
                         'status' => $m->status,
                         'target_deadline' => $m->target_deadline,
                     ];
                 }),
                 'document_vault_pre_read' => $mentee->documents->map(function ($doc) {
                     return [
+                        'document_id' => $doc->id,
                         'file_name' => $doc->file_name,
                         'file_type' => $doc->file_type,
                         'status' => $doc->status,
-                        'file_path' => asset('storage/' . $doc->file_path),
+                        // Menghasilkan Temporary Signed URL yang otomatis mendekripsi file saat dibuka
+                        'preview_url' => URL::temporarySignedRoute(
+                            'document.download', now()->addMinutes(60), ['documentVault' => $doc->id]
+                        ),
                     ];
                 }),
             ]
@@ -222,7 +250,6 @@ class MentorPortalController extends Controller
 
             DB::commit();
 
-            // Kirim Email via Blade Template
             $mentee = $booking->mentee;
             $slot = $booking->availability;
 
@@ -284,10 +311,12 @@ class MentorPortalController extends Controller
         try {
             $booking->update(['session_status' => 'cancelled']);
             
-            // Hapus slot availability secara permanen (tutup slot)
             if ($booking->availability) {
                 $booking->availability->delete();
             }
+
+            // REFUND TOKEN KE MENTEE 
+            $booking->mentee->increment('token_balance', 1);
 
             DB::commit();
 
@@ -314,7 +343,7 @@ class MentorPortalController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Sesi konsultasi ditolak dan slot waktu telah ditutup (dihapus).',
+                'message' => 'Sesi konsultasi ditolak, slot dihapus, dan 1 Token telah dikembalikan ke mentee.',
                 'data' => $booking
             ], 200);
 
@@ -359,16 +388,13 @@ class MentorPortalController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Bebaskan slot lama
             $booking->availability->update(['is_booked' => false]);
 
-            // 2. Hubungkan ke slot baru
             $booking->update([
                 'availability_id' => $newAvailability->id,
                 'session_status' => 'confirmed' 
             ]);
 
-            // 3. Tandai slot baru ter-book
             $newAvailability->update(['is_booked' => true]);
 
             DB::commit();

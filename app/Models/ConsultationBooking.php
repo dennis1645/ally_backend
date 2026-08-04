@@ -16,6 +16,7 @@ class ConsultationBooking extends Model
         'token_cost', // Menggantikan transaction_detail_id
         'session_status',
         'meeting_link',
+        'user_milestone_id'
     ];
 
     protected function casts(): array

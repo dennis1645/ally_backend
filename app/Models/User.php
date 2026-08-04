@@ -21,8 +21,8 @@ use Laravel\Sanctum\HasApiTokens;
     'role', 
     'status', 
     'readiness_score', 
-    'token_balance',       // Ditambahkan
-    'premium_until',       // Ditambahkan
+    'token_balance',       
+    'premium_until',       
     'profile_picture_url', 
     'headline', 
     'bio', 
@@ -32,6 +32,7 @@ use Laravel\Sanctum\HasApiTokens;
     'current_streak', 
     'longest_streak',
     'is_premium',
+    'assigned_mentor_id'
 ])]
 #[Hidden([
     'password', 
@@ -54,8 +55,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'readiness_score' => 'integer',
-            'token_balance' => 'integer',    // Ditambahkan
-            'premium_until' => 'datetime',   // Ditambahkan
+            'token_balance' => 'integer',    
+            'premium_until' => 'datetime',   
             'xp_points' => 'integer',
             'current_streak' => 'integer',
             'longest_streak' => 'integer',
@@ -91,6 +92,18 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserMilestone::class);
     }
 
+    /**
+     * Relasi ke Document Vault (Nama fungsi disesuaikan dengan controller)
+     */
+    public function documents()
+    {
+        // Diperbaiki: DocumentVault::class (tanpa 's' sesuai nama file model di VS Code)
+        return $this->hasMany(DocumentVault::class, 'user_id'); 
+    }
+
+    /**
+     * Relasi Alias untuk Document Vault (Opsional, jika sudah terlanjur dipakai di tempat lain)
+     */
     public function documentVaults()
     {
         return $this->hasMany(DocumentVault::class);
@@ -121,6 +134,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ActionPlan::class, 'mentee_id');
     }
 
+    /**
+     * Relasi ke Target Beasiswa (Dibutuhkan di getMenteeList)
+     */
+    public function scholarships()
+    {
+        return $this->belongsToMany(Scholarship::class, 'user_scholarships', 'user_id', 'scholarship_id');
+    }
+
+    /**
+     * Relasi tunggal ke Hasil Diagnostic terbaru (Dibutuhkan di getPreSessionDossier)
+     */
+    public function diagnosticAssessment()
+    {
+        return $this->hasOne(DiagnosticAssessment::class)->latestOfMany();
+    }
+
+    /**
+     * Relasi jamak ke semua riwayat Diagnostic 
+     */
+    public function diagnosticAssessments()
+    {
+        return $this->hasMany(DiagnosticAssessment::class);
+    }
+
     // ==========================================
     // RELASI SEBAGAI MENTOR
     // ==========================================
@@ -147,10 +184,5 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendPasswordResetNotification($token)
     {
         $this->notify(new \App\Notifications\CustomResetPassword($token));
-    }
-
-    public function diagnosticAssessments()
-    {
-        return $this->hasMany(DiagnosticAssessment::class);
     }
 }

@@ -69,6 +69,16 @@ return new class extends Migration
         });
 
         // ==========================================
+        // TAMBAHAN: PIVOT TABLE: RELASI USER & TARGET BEASISWA
+        // ==========================================
+        Schema::create('user_scholarships', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('scholarship_id')->constrained()->cascadeOnDelete();
+            $table->timestamps();
+        });
+
+        // ==========================================
         // 4. REQUIREMENTS CHECKLIST & DYNAMIC TIMELINE
         // ==========================================
         Schema::create('user_milestones', function (Blueprint $table) {
@@ -151,6 +161,7 @@ return new class extends Migration
         Schema::dropIfExists('daily_journals');
         Schema::dropIfExists('document_vaults');
         Schema::dropIfExists('user_milestones');
+        Schema::dropIfExists('user_scholarships'); // Tambahkan di down() juga
         Schema::dropIfExists('scholarship_university');
         Schema::dropIfExists('scholarships');
         Schema::dropIfExists('universities');

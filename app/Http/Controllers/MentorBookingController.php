@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Models\User;
 use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
 
@@ -22,10 +23,10 @@ class MentorBookingController extends Controller
             'availability_id' => 'required|exists:mentor_availabilities,id',
         ]);
 
-        $mentee = Auth::user();
+        $authUser = Auth::user();
 
         // 1. Cek apakah user adalah mentee (role user biasa)
-        if ($mentee->role !== 'user') {
+        if ($authUser->role !== 'user') {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Hanya mentee/user yang dapat melakukan booking konsultasi mentor.'
@@ -33,52 +34,61 @@ class MentorBookingController extends Controller
         }
 
         // 2. Cek apakah user sudah berstatus premium
-        if (!$mentee->is_premium) {
+        if (!$authUser->is_premium) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Fitur booking konsultasi mentor eksklusif untuk member premium. Silakan upgrade akun terlebih dahulu.'
             ], 403);
         }
 
-        // 3. Cek apakah mentee memiliki token yang cukup
-        if ($mentee->token_balance < 1) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Token mentor Anda habis atau tidak mencukupi. Silakan beli paket token di Shop terlebih dahulu.'
-            ], 402); // 402 Payment Required
-        }
-
-        $availability = MentorAvailability::with('mentor')->findOrFail($request->availability_id);
-
-        // 4. Cek apakah slot sudah dibooking orang lain
-        if ($availability->is_booked) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Maaf, slot waktu konsultasi ini sudah dibooking oleh orang lain.'
-            ], 400);
-        }
-
         DB::beginTransaction();
         try {
-            // 5. Simpan Consultation Booking dengan memotong token
+            // 3. Ambil data mentee dengan Pessimistic Lock untuk mencegah double-spend token
+            $mentee = User::where('id', $authUser->id)->lockForUpdate()->first();
+
+            // Cek apakah mentee memiliki token yang cukup di dalam transaksi
+            if ($mentee->token_balance < 1) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Token mentor Anda habis atau tidak mencukupi. Silakan beli paket token di Shop terlebih dahulu.'
+                ], 402); // 402 Payment Required
+            }
+
+            // 4. Ambil slot waktu dengan Pessimistic Lock untuk mencegah double-booking
+            $availability = MentorAvailability::with('mentor')
+                ->where('id', $request->availability_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Cek apakah slot sudah dibooking orang lain di dalam transaksi
+            if ($availability->is_booked) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Maaf, slot waktu konsultasi ini sudah dibooking oleh orang lain.'
+                ], 400);
+            }
+
+            // 5. Simpan Consultation Booking dengan histori potongan token
             $booking = ConsultationBooking::create([
                 'mentee_id' => $mentee->id,
                 'mentor_id' => $availability->mentor_id,
                 'availability_id' => $availability->id,
-                'token_cost' => 1, // Menyimpan histori biaya token
+                'token_cost' => 1, 
                 'session_status' => 'pending',
                 'meeting_link' => null, 
             ]);
 
-            // 6. Tandai slot mentor sebagai ter-book agar tidak bisa dipilih mentee lain
+            // 6. Tandai slot mentor sebagai ter-book
             $availability->update(['is_booked' => true]);
 
-            // 7. Potong saldo token mentee (decrement menghindari race conditions)
+            // 7. Potong saldo token mentee (aman karena baris user sudah di-lock)
             $mentee->decrement('token_balance', 1);
 
             DB::commit();
 
-            // 8. Kirim Email Notifikasi ke Mentor secara otomatis
+            // 8. Kirim Email Notifikasi ke Mentor secara otomatis (Dilakukan setelah commit agar tidak memblokir antrean database)
             $mentor = $availability->mentor;
 
             try {

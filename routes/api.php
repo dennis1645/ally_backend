@@ -62,6 +62,34 @@ Route::middleware('auth:sanctum')->group(function () {
     // Document Vault (Brankas Penyimpanan Terenkripsi)
     Route::apiResource('vault', DocumentVaultController::class)->except(['update']);
 
+    // =========================================================================
+    // Signed Route untuk Preview Dokumen Vault yang Terenkripsi oleh Mentor
+    // =========================================================================
+    Route::get('/document/download/{documentVault}', function (\Illuminate\Http\Request $request, \App\Models\DocumentVault $documentVault) {
+        if (! $request->hasValidSignature()) {
+            abort(401, 'URL dokumen telah kadaluarsa atau tidak valid.');
+        }
+
+        // Cek apakah file fisik terenkripsi ada di storage local
+        if (! \Illuminate\Support\Facades\Storage::disk('local')->exists($documentVault->file_path)) {
+            abort(404, 'File fisik dokumen tidak ditemukan.');
+        }
+
+        try {
+            // Ambil konten terenkripsi lalu dekripsi on-the-fly
+            $encryptedContent = \Illuminate\Support\Facades\Storage::disk('local')->get($documentVault->file_path);
+            $decryptedContent = \Illuminate\Support\Facades\Crypt::decryptString($encryptedContent);
+
+            // Kirim response inline agar bisa di-preview langsung (misal di iframe browser)
+            return response($decryptedContent, 200)
+                ->header('Content-Type', $documentVault->mime_type)
+                ->header('Content-Disposition', 'inline; filename="' . $documentVault->file_name . '"');
+
+        } catch (\Exception $e) {
+            abort(500, 'Gagal memproses dan mendekripsi dokumen.');
+        }
+    })->name('document.download');
+
     // Diagnostic Assessment (User Side)
     Route::prefix('diagnostic')->group(function () {
         Route::get('/questions', [UserDiagnosticController::class, 'getQuestions']);
