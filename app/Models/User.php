@@ -37,7 +37,6 @@ use Laravel\Sanctum\HasApiTokens;
     'password', 
     'remember_token',
     'google_id',  // Best practice: Menyembunyikan ID OAuth dari response JSON API
-    'linkedin_id' 
 ])]
 class User extends Authenticatable implements MustVerifyEmail
 {

@@ -19,14 +19,22 @@ return new class extends Migration
             
             // Atribut Khusus Sistem Beasiswa
             $table->enum('role', ['user', 'mentor', 'admin'])->default('user');
+            
+            // Posisikan langsung di bawah 'role' (tanpa modifier ->after)
+            $table->foreignId('assigned_mentor_id')
+                  ->nullable()
+                  ->constrained('users')
+                  ->nullOnDelete()
+                  ->comment('Mentor tetap yang di-assign ke mentee ini');
+
             $table->boolean('is_premium')->default(false); 
             $table->enum('status', ['active', 'suspended'])->default('active');
             $table->integer('readiness_score')->nullable(); 
             
-            // Saldo token untuk booking mentor (Hapus ->after)
+            // Saldo token untuk booking mentor
             $table->integer('token_balance')->default(0);
             
-            // Batas waktu masa aktif premium (Berlangganan) (Hapus ->after)
+            // Batas waktu masa aktif premium (Berlangganan)
             $table->timestamp('premium_until')->nullable();
             
             // Profil & Portofolio (Berguna untuk Mentor & Mentee)

@@ -98,6 +98,13 @@ return new class extends Migration
             $table->foreignId('mentor_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('availability_id')->constrained('mentor_availabilities')->cascadeOnDelete();
             
+            // Hapus modifier ->after('availability_id') di sini
+            $table->foreignId('user_milestone_id')
+                  ->nullable()
+                  ->constrained('user_milestones')
+                  ->cascadeOnDelete()
+                  ->comment('Fase milestone tempat konsultasi ini dilakukan');
+            
             // Transaksi Midtrans dilepas, diganti dengan Token Cost
             $table->integer('token_cost')->default(1)->comment('Berapa token yang dihabiskan untuk sesi ini');
             

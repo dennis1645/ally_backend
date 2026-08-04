@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-use App\Mail\PremiumRefundMail; // <-- IMPORT MAILABLE BARU DI SINI
+use App\Mail\PremiumRefundMail;
+use App\Mail\MentorCreatedMail; // <-- IMPORT MAILABLE BARU UNTUK MENTOR
 
 class AdminController extends Controller
 {
@@ -84,8 +85,13 @@ class AdminController extends Controller
             ], 422);
         }
 
+        // Simpan password asli (plain text) untuk dikirim ke email nanti
+        $plainPassword = $request->password;
+
         $validated = $validator->validated();
-        $validated['password'] = Hash::make($validated['password']);
+        
+        // Hash password untuk disimpan ke database
+        $validated['password'] = Hash::make($plainPassword);
         
         // Default status adalah active
         $validated['status'] = 'active';
@@ -95,9 +101,23 @@ class AdminController extends Controller
         // Langsung verifikasi email jika dibuat oleh admin
         $user->markEmailAsVerified();
 
+        // --- TAMBAHAN: Kirim Email Jika Role adalah Mentor ---
+        if ($user->role === 'mentor') {
+            try {
+                // Mengirim email berisi email login dan password plain text
+                Mail::to($user->email)->send(new MentorCreatedMail($user, $plainPassword));
+            } catch (\Exception $e) {
+                // Log error jika gagal agar proses API tidak berhenti/crash
+                \Illuminate\Support\Facades\Log::error("Failed to send credentials to mentor {$user->email}: " . $e->getMessage());
+            }
+        }
+        // -----------------------------------------------------
+
         return response()->json([
             'status' => 'success',
-            'message' => 'User created successfully.',
+            'message' => $user->role === 'mentor' 
+                ? 'Mentor created successfully and credentials have been emailed.' 
+                : 'User created successfully.',
             'data' => $user
         ], 201);
     }
