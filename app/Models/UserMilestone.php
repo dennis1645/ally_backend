@@ -10,6 +10,7 @@ class UserMilestone extends Model
     use HasFactory;
 
     protected $fillable = [
+        'parent_id',      // Ditambahkan untuk fitur branching (sub-task)
         'user_id',
         'scholarship_id',
         'university_id',
@@ -31,6 +32,30 @@ class UserMilestone extends Model
         'target_deadline' => 'date',
         'completed_at' => 'datetime',
     ];
+
+    // ==========================================
+    // RELASI UNTUK FITUR BRANCHING (SUB-TASK)
+    // ==========================================
+
+    /**
+     * Mendapatkan task utama (parent) jika task ini adalah sebuah cabang (sub-task)
+     */
+    public function parent()
+    {
+        return $this->belongsTo(UserMilestone::class, 'parent_id');
+    }
+
+    /**
+     * Mendapatkan semua cabang/sub-task dari task utama ini
+     */
+    public function subTasks()
+    {
+        return $this->hasMany(UserMilestone::class, 'parent_id');
+    }
+
+    // ==========================================
+    // RELASI UMUM
+    // ==========================================
 
     public function user()
     {

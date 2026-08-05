@@ -83,6 +83,10 @@ return new class extends Migration
         // ==========================================
         Schema::create('user_milestones', function (Blueprint $table) {
             $table->id();
+            
+            // PENAMBAHAN UNTUK FITUR TASK BRANCHING (SUB-TASK)
+            $table->foreignId('parent_id')->nullable()->constrained('user_milestones')->cascadeOnDelete();
+            
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             
             $table->foreignId('scholarship_id')->nullable()->constrained()->cascadeOnDelete(); 

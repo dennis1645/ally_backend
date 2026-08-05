@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
 use App\Models\ActionPlan;
-use App\Models\UserMilestone; // Tambahkan import UserMilestone
+use App\Models\UserMilestone;
 
 class MentorPortalController extends Controller
 {
@@ -47,7 +47,6 @@ class MentorPortalController extends Controller
                     'name' => $mentee->name,
                     'email' => $mentee->email,
                     'phone_number' => $mentee->phone_number,
-                    // UPGRADE: Gunakan Null-safe operator (?->) agar tidak error jika belum ada beasiswa
                     'target_scholarship' => $mentee->scholarships->first()?->name ?? 'Belum ditentukan',
                     'target_country' => $mentee->scholarships->first()?->country ?? 'Belum ditentukan',
                     'readiness_score' => $mentee->readiness_score,
@@ -69,7 +68,7 @@ class MentorPortalController extends Controller
     }
 
     /**
-     * 2. PRE-SESSION DOSSIER & PRE-READ (Detail Lengkap Mentee & Meeting Link)
+     * 2. PRE-SESSION DOSSIER & PRE-READ
      */
     public function getPreSessionDossier($bookingId)
     {
@@ -126,7 +125,6 @@ class MentorPortalController extends Controller
                     'profile_picture_url' => $mentee->profile_picture_url,
                     'readiness_score' => $mentee->readiness_score,
                     'xp_points' => $mentee->xp_points,
-                    // UPGRADE: Gunakan Null-safe operator (?->)
                     'target_scholarship' => $mentee->scholarships->first()?->name ?? 'Belum ditentukan',
                     'target_country' => $mentee->scholarships->first()?->country ?? 'Belum ditentukan',
                 ],
@@ -139,6 +137,8 @@ class MentorPortalController extends Controller
                 ] : null,
                 'milestones_progress' => $mentee->milestones->map(function ($m) {
                     return [
+                        'milestone_id' => $m->id,
+                        'parent_id' => $m->parent_id, // Untuk melihat apakah ini cabang atau utama
                         'task_name' => $m->task_name,
                         'description' => $m->description,
                         'status' => $m->status,
@@ -279,7 +279,6 @@ class MentorPortalController extends Controller
      */
     public function rejectBooking(Request $request, $bookingId)
     {
-        // ... (Fungsi ini sudah aman dari sebelumnya, tidak perlu banyak perubahan)
         $mentor = Auth::user();
 
         if ($mentor->role !== 'mentor') {
@@ -328,7 +327,6 @@ class MentorPortalController extends Controller
      */
     public function rescheduleBooking(Request $request, $bookingId)
     {
-        // ... (Logic sudah aman)
         $mentor = Auth::user();
         $request->validate([
             'new_availability_id' => 'required|exists:mentor_availabilities,id',
@@ -370,7 +368,7 @@ class MentorPortalController extends Controller
     }
 
     /**
-     * 5. CUSTOM ACTION PLAN MANAGEMENT & MARK SESSION AS COMPLETED
+     * 5. CUSTOM ACTION PLAN MANAGEMENT (TASK BRANCHING)
      */
     public function storeActionPlan(Request $request, $bookingId)
     {
@@ -380,9 +378,11 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
+        // VALIDASI BARU: Menambahkan parent_milestone_id agar bisa membuat branch
         $request->validate([
             'task_description' => 'required|string|max:255',
             'deadline' => 'required|date|after_or_equal:today',
+            'parent_milestone_id' => 'nullable|exists:user_milestones,id' // <-- UPDATE INI
         ]);
 
         $booking = ConsultationBooking::where('id', $bookingId)
@@ -393,7 +393,6 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Booking tidak ditemukan.'], 404);
         }
 
-        // UPGRADE: Pastikan sesi sudah di-confirm/completed, bukan pending atau cancelled
         if (!in_array($booking->session_status, ['confirmed', 'completed'])) {
             return response()->json([
                 'status' => 'error', 
@@ -412,10 +411,24 @@ class MentorPortalController extends Controller
                 'is_completed' => false,
             ]);
 
-            // 2. Simpan ke Milestone Mentee agar jadi checklist
+            // 2. LOGIKA BRANCHING: Cari tahu parent milestone-nya jika dikirimkan oleh mentor
+            $inheritedScholarshipId = null;
+            if ($request->filled('parent_milestone_id')) {
+                $parentMilestone = UserMilestone::where('id', $request->parent_milestone_id)
+                    ->where('user_id', $booking->mentee_id)
+                    ->first();
+                
+                // Jika branch ini punya parent, warisi ID beasiswanya agar terkelompok rapi
+                if ($parentMilestone) {
+                    $inheritedScholarshipId = $parentMilestone->scholarship_id;
+                }
+            }
+
+            // 3. Simpan ke Milestone Mentee sebagai Branch (Jika parent_id ada) atau Main Task
             UserMilestone::create([
                 'user_id' => $booking->mentee_id,
-                'scholarship_id' => null,
+                'parent_id' => $request->parent_milestone_id ?? null, // <-- MASUKKAN KE BRANCH
+                'scholarship_id' => $inheritedScholarshipId,          // <-- MEWARISI BEASISWA
                 'task_name' => '[Action Plan Mentor]: ' . $request->task_description,
                 'description' => 'Tugas tambahan dari hasil sesi mentoring 1-on-1.',
                 'target_deadline' => $request->deadline,
@@ -425,7 +438,7 @@ class MentorPortalController extends Controller
                 'xp_reward' => 50,
             ]);
 
-            // UPGRADE: 3. Tandai sesi sebagai Selesai (Completed) jika mentor mengisi post-session log ini
+            // 4. Tandai sesi sebagai Selesai (Completed)
             if ($booking->session_status !== 'completed') {
                 $booking->update(['session_status' => 'completed']);
             }
@@ -434,8 +447,9 @@ class MentorPortalController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Action plan berhasil dibuat dan sesi otomatis ditandai selesai (Completed).',
-                'data' => $actionPlan
+                'message' => 'Action plan berhasil dibuat dan sesi otomatis ditandai selesai.',
+                'data' => $actionPlan,
+                'branch_info' => $request->filled('parent_milestone_id') ? 'Ditambahkan sebagai sub-task dari milestone ID: ' . $request->parent_milestone_id : 'Ditambahkan sebagai tugas utama baru.'
             ], 201);
 
         } catch (\Exception $e) {

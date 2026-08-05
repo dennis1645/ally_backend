@@ -21,6 +21,7 @@ use App\Http\Controllers\AdminPracticeExamController;
 use App\Http\Controllers\DailyDrillController;
 use App\Http\Controllers\AdminBadgeController; 
 use App\Http\Controllers\MentorDocumentController;
+use App\Http\Controllers\BookmarkController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -45,6 +46,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/update-profile', [ProfileController::class, 'update']); 
+
+    // Bookmark System
+    Route::prefix('bookmarks')->group(function () {
+        Route::get('/', [BookmarkController::class, 'index']); // Get list bookmark
+        Route::post('/toggle', [BookmarkController::class, 'toggleBookmark']); // Add / Remove bookmark
+    });
     
     // Endpoint Khusus Setup/Update Profil Akademik & Target (Task 1.5 Milestone 2)
     // Bisa diarahkan ke fungsi update yang sama karena menggunakan validasi "sometimes"

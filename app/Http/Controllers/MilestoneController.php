@@ -31,7 +31,7 @@ class MilestoneController extends Controller
     }
 
     /**
-     * GET: Mengambil daftar semua milestone / task timeline milik user
+     * GET: Mengambil daftar semua milestone / task timeline milik user (Mendukung Task Branching)
      */
     public function getTimeline(Request $request)
     {
@@ -42,9 +42,16 @@ class MilestoneController extends Controller
         $user = Auth::user();
         $scholarshipId = $request->scholarship_id;
 
+        // MENGAMBIL TUGAS UTAMA (ROOT) BESERTA CABANGNYA (SUB-TASK)
         $milestones = UserMilestone::where('user_id', $user->id)
             ->where('scholarship_id', $scholarshipId)
+            ->whereNull('parent_id') // WAJIB: Hanya ambil tugas utama (bukan cabang)
+            ->with(['subTasks' => function($query) {
+                // Urutkan tugas cabang (dari mentor) berdasarkan deadline terdekat
+                $query->orderBy('target_deadline', 'asc');
+            }])
             ->orderBy('step_order', 'asc')
+            ->orderBy('target_deadline', 'asc')
             ->get();
 
         if ($milestones->isEmpty()) {
@@ -117,6 +124,7 @@ class MilestoneController extends Controller
 
         DB::beginTransaction();
         try {
+            // Hapus timeline lama untuk beasiswa ini (opsional tergantung flow aplikasi kamu)
             UserMilestone::where('user_id', $user->id)
                 ->where('scholarship_id', $scholarship->id)
                 ->delete();
@@ -127,6 +135,7 @@ class MilestoneController extends Controller
                 
                 $milestonesToInsert[] = [
                     'user_id'         => $user->id,
+                    'parent_id'       => null, // Secara default AI meng-generate tugas utama
                     'scholarship_id'  => $scholarship->id,
                     'university_id'   => $firstUniversityId,
                     'task_name'       => $task['task_name'],
@@ -357,4 +366,4 @@ class MilestoneController extends Controller
             ], 500);
         }
     }
-}
+}   
