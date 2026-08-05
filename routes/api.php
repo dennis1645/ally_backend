@@ -17,6 +17,9 @@ use App\Http\Controllers\MentorBookingController;
 use App\Http\Controllers\ShopController; 
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\AdminShopItemController; 
+use App\Http\Controllers\AdminPracticeExamController;
+use App\Http\Controllers\DailyDrillController;
+use App\Http\Controllers\AdminBadgeController; 
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -62,9 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Document Vault (Brankas Penyimpanan Terenkripsi)
     Route::apiResource('vault', DocumentVaultController::class)->except(['update']);
 
-    // =========================================================================
     // Signed Route untuk Preview Dokumen Vault yang Terenkripsi oleh Mentor
-    // =========================================================================
     Route::get('/document/download/{documentVault}', function (\Illuminate\Http\Request $request, \App\Models\DocumentVault $documentVault) {
         if (! $request->hasValidSignature()) {
             abort(401, 'URL dokumen telah kadaluarsa atau tidak valid.');
@@ -95,6 +96,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/questions', [UserDiagnosticController::class, 'getQuestions']);
         Route::post('/submit', [UserDiagnosticController::class, 'submitAssessment']);
         Route::get('/my-result', [UserDiagnosticController::class, 'getMyAssessment']);
+    });
+
+    // Daily Drill (Micro-learning) Routes
+    Route::prefix('daily-drills')->group(function () {
+        Route::get('/generate', [DailyDrillController::class, 'generateDrill']);
+        Route::post('/submit', [DailyDrillController::class, 'submitDrill']);
+        Route::get('/history', [DailyDrillController::class, 'history']);
+        Route::get('/{id}', [DailyDrillController::class, 'show']);
     });
 
     // User Milestone & AI Timeline Routes
@@ -183,12 +192,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'update']);
         Route::delete('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'destroy']);
 
-        // --- TAMBAHAN: Shop Item Management ---
+        // Shop Item Management
         Route::get('/shop-items', [AdminShopItemController::class, 'index']);
         Route::post('/shop-items', [AdminShopItemController::class, 'store']);
         Route::get('/shop-items/{id}', [AdminShopItemController::class, 'show']);
         Route::put('/shop-items/{id}', [AdminShopItemController::class, 'update']);
         Route::delete('/shop-items/{id}', [AdminShopItemController::class, 'destroy']);
+
+        // Practice Exams Management (Latihan Bahasa Inggris)
+        Route::get('/practice-exams', [AdminPracticeExamController::class, 'index']);
+        Route::get('/practice-exams/{id}', [AdminPracticeExamController::class, 'showExam']);
+        Route::post('/practice-exams/import', [AdminPracticeExamController::class, 'importExcel']);
+        Route::put('/practice-exams/{id}', [AdminPracticeExamController::class, 'updateExam']);
+        Route::delete('/practice-exams/clear-all', [AdminPracticeExamController::class, 'destroyAll']);
+        Route::delete('/practice-exams/{id}', [AdminPracticeExamController::class, 'destroyExam']);
+        
+        Route::put('/practice-questions/{id}', [AdminPracticeExamController::class, 'updateQuestion']);
+        Route::delete('/practice-questions/{id}', [AdminPracticeExamController::class, 'destroyQuestion']);
+
+        // Badge / Gamification Management
+        Route::get('/badges', [AdminBadgeController::class, 'index']);
+        Route::post('/badges', [AdminBadgeController::class, 'store']);
+        Route::get('/badges/{id}', [AdminBadgeController::class, 'show']);
+        Route::put('/badges/{id}', [AdminBadgeController::class, 'update']);
+        Route::delete('/badges/{id}', [AdminBadgeController::class, 'destroy']);
         
     });
 });

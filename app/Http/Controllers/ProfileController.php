@@ -14,6 +14,9 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         
+        // Memuat relasi badges yang dimiliki user
+        $user->load('badges');
+        
         // Sembunyikan field password dari response
         $user->makeHidden(['password']);
 
@@ -105,7 +108,8 @@ class ProfileController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Profile updated successfully.',
-            'data' => $user->fresh()->makeHidden(['password'])
+            // Refresh data user, load badges, dan sembunyikan password
+            'data' => $user->fresh()->load('badges')->makeHidden(['password'])
         ]);
     }
 }

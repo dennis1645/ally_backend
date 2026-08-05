@@ -116,7 +116,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function badges()
     {
-        return $this->belongsToMany(Badge::class, 'user_badges')->withPivot('earned_at');
+        return $this->belongsToMany(Badge::class, 'user_badges', 'user_id', 'badge_id')
+                    ->withPivot('earned_at');
     }
 
     public function transactions()
@@ -185,4 +186,21 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $this->notify(new \App\Notifications\CustomResetPassword($token));
     }
+
+    /**
+     * Relasi: User memiliki banyak riwayat pengerjaan latihan/ujian (IELTS/TOEFL).
+     */
+    public function practiceAttempts()
+    {
+        return $this->hasMany(PracticeAttempt::class, 'user_id');
+    }
+
+    /**
+     * Relasi: User memiliki banyak riwayat latihan harian (Daily Drills).
+     */
+    public function dailyDrills()
+    {
+        return $this->hasMany(DailyDrill::class, 'user_id');
+    }
+    
 }

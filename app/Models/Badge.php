@@ -16,9 +16,10 @@ class Badge extends Model
         'required_xp',
     ];
 
-    // Relasi Many-to-Many ke User
+    // Relasi ke User (Many-to-Many melalui tabel user_badges)
     public function users()
     {
-        return $this->belongsToMany(User::class, 'user_badges')->withPivot('earned_at');
+        return $this->belongsToMany(User::class, 'user_badges', 'badge_id', 'user_id')
+                    ->withPivot('earned_at');
     }
 }
