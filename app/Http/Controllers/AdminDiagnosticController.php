@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\DiagnosticQuestionsImport; // The import class we created
+use App\Imports\DiagnosticQuestionsImport; 
 
 class AdminDiagnosticController extends Controller
 {
@@ -59,7 +59,8 @@ class AdminDiagnosticController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'question_text' => 'required|string',
-            'category' => 'required|string',
+            // Tambahan: Validasi ketat agar kategori tidak typo dan sesuai dengan sistem scoring
+            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',
             'options.*.option_text' => 'required|string',
@@ -118,7 +119,8 @@ class AdminDiagnosticController extends Controller
 
         $validator = Validator::make($request->all(), [
             'question_text' => 'required|string',
-            'category' => 'required|string',
+            // Tambahan: Validasi ketat agar kategori tidak typo
+            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',
             'options.*.option_text' => 'required|string',
@@ -189,12 +191,7 @@ class AdminDiagnosticController extends Controller
     public function destroyAll()
     {
         try {
-            // This will delete all questions and trigger cascade delete for options
             DiagnosticQuestion::query()->delete();
-
-            // Optional: Reset auto-increment ID to 1 (MySQL specific, uncomment if needed)
-            // DB::statement('ALTER TABLE diagnostic_questions AUTO_INCREMENT = 1');
-            // DB::statement('ALTER TABLE diagnostic_options AUTO_INCREMENT = 1');
 
             return response()->json([
                 'status' => 'success',

@@ -20,7 +20,6 @@ return new class extends Migration
             // Atribut Khusus Sistem Beasiswa
             $table->enum('role', ['user', 'mentor', 'admin'])->default('user');
             
-            // Posisikan langsung di bawah 'role' (tanpa modifier ->after)
             $table->foreignId('assigned_mentor_id')
                   ->nullable()
                   ->constrained('users')
@@ -31,13 +30,21 @@ return new class extends Migration
             $table->enum('status', ['active', 'suspended'])->default('active');
             $table->integer('readiness_score')->nullable(); 
             
-            // Saldo token untuk booking mentor
+            // ==========================================
+            // AKADEMIK & TARGET (Task 1.5 Milestone 2)
+            // ==========================================
+            $table->decimal('gpa', 3, 2)->nullable(); // IPK, format misal: 3.85
+            $table->string('undergraduate_major')->nullable(); // Jurusan S1
+            $table->string('target_major')->nullable(); // Target Jurusan S2
+            $table->string('primary_scholarship_target')->nullable(); // 1 Primary Target Beasiswa
+            
+            // Saldo token untuk booking mentor (Tidak akan reset saat ganti target)
             $table->integer('token_balance')->default(0);
             
-            // Batas waktu masa aktif premium (Berlangganan)
+            // Batas waktu masa aktif premium 12 bulan (Tidak akan reset saat ganti target)
             $table->timestamp('premium_until')->nullable();
             
-            // Profil & Portofolio (Berguna untuk Mentor & Mentee)
+            // Profil & Portofolio
             $table->string('profile_picture_url')->nullable(); 
             $table->string('headline')->nullable(); 
             $table->text('bio')->nullable(); 
@@ -48,6 +55,7 @@ return new class extends Migration
             
             // Sistem Gamifikasi & Retensi User
             $table->integer('xp_points')->default(0); 
+            // Level tidak dimasukkan ke DB, melainkan di-generate dinamis di Model via Accessor!
             $table->integer('current_streak')->default(0); 
             $table->integer('longest_streak')->default(0); 
             

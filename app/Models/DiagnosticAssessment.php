@@ -13,9 +13,10 @@ class DiagnosticAssessment extends Model
         'user_id',
         'overall_score',
         'academic_score',
+        'goals_score',
+        'leadership_experience_score',
         'language_score',
-        'experience_score',
-        'document_score',
+        'application_readiness_score',
         'weaknesses_mapping',
         'strengths_mapping',
         'system_recommendation'

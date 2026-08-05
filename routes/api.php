@@ -20,6 +20,7 @@ use App\Http\Controllers\AdminShopItemController;
 use App\Http\Controllers\AdminPracticeExamController;
 use App\Http\Controllers\DailyDrillController;
 use App\Http\Controllers\AdminBadgeController; 
+use App\Http\Controllers\MentorDocumentController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -44,6 +45,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/update-profile', [ProfileController::class, 'update']); 
+    
+    // Endpoint Khusus Setup/Update Profil Akademik & Target (Task 1.5 Milestone 2)
+    // Bisa diarahkan ke fungsi update yang sama karena menggunakan validasi "sometimes"
+    Route::post('/profile/academic-target', [ProfileController::class, 'update']);
     
     // University Module
     Route::get('/universities', [UniversityController::class, 'index']);
@@ -111,12 +116,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [MilestoneController::class, 'getTimeline']);
         Route::post('/generate', [MilestoneController::class, 'generateTimeline']);
         Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); 
-        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);     
+        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);    
     });
 
     // Shop & Monetization (Premium & Tokens)
     Route::prefix('shop')->group(function () {
-        Route::get('/items', [ShopController::class, 'index']);       // Melihat daftar paket (Premium / Token)
+        Route::get('/items', [ShopController::class, 'index']);      // Melihat daftar paket (Premium / Token)
         Route::post('/checkout', [ShopController::class, 'checkout']); // Membeli paket dan mendapatkan Snap Token
     });
 
@@ -126,6 +131,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{identifier}', [TransactionController::class, 'show']); // Cek status 1 transaksi
     });
 
+    // MENTOR DOCUMENTS: Akses Dokumen Mentor via Tautan (VIEW & HONEYPOT)
+    Route::get('/documents/view/{share_token}', [MentorDocumentController::class, 'viewSharedDocument']);
+    Route::get('/documents/download/{share_token}', [MentorDocumentController::class, 'downloadTrap']); // Rute Jebakan (Honeypot)
+    
     // AI Mentor Chatbot
     Route::prefix('ai-mentor')->group(function () {
         Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
@@ -133,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Mentor Booking
     Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
+    Route::get('/my-bookings', [MentorBookingController::class, 'getMyBookings']);
     
     // MENTOR MODULE (Mentor Only)
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
@@ -153,6 +163,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Custom Action Plan Generation (Pasca-Konsultasi)
         Route::post('/bookings/{bookingId}/action-plans', [MentorPortalController::class, 'storeActionPlan']);
+
+        // Mentor Document Sharing
+        Route::get('/documents', [MentorDocumentController::class, 'index']);
+        Route::post('/documents', [MentorDocumentController::class, 'store']);
+        Route::delete('/documents/{id}', [MentorDocumentController::class, 'destroy']);
     });
 
     // ADMIN MODULE (Admin Only)

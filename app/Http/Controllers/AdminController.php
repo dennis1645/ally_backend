@@ -7,9 +7,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use App\Mail\PremiumRefundMail;
-use App\Mail\MentorCreatedMail; // <-- IMPORT MAILABLE BARU UNTUK MENTOR
+use App\Mail\MentorCreatedMail;
+use App\Mail\UserStatusChangedMail; // <-- IMPORT MAILABLE STATUS BARU
 
 class AdminController extends Controller
 {
@@ -69,7 +71,7 @@ class AdminController extends Controller
                 'regex:/^[0-9\-\+\(\)]+$/', 'unique:users,phone_number'
             ],
             'gender' => 'nullable|in:male,female',
-            'role' => 'required|in:user,mentor', // Admin tidak boleh ditambahkan
+            'role' => 'required|in:user,mentor', 
             'password' => [
                 'required', 'string',
                 PasswordRule::min(8)->mixedCase()->numbers()->symbols()
@@ -85,33 +87,22 @@ class AdminController extends Controller
             ], 422);
         }
 
-        // Simpan password asli (plain text) untuk dikirim ke email nanti
         $plainPassword = $request->password;
-
         $validated = $validator->validated();
         
-        // Hash password untuk disimpan ke database
         $validated['password'] = Hash::make($plainPassword);
-        
-        // Default status adalah active
         $validated['status'] = 'active';
 
         $user = User::create($validated);
-        
-        // Langsung verifikasi email jika dibuat oleh admin
         $user->markEmailAsVerified();
 
-        // --- TAMBAHAN: Kirim Email Jika Role adalah Mentor ---
         if ($user->role === 'mentor') {
             try {
-                // Mengirim email berisi email login dan password plain text
                 Mail::to($user->email)->send(new MentorCreatedMail($user, $plainPassword));
             } catch (\Exception $e) {
-                // Log error jika gagal agar proses API tidak berhenti/crash
-                \Illuminate\Support\Facades\Log::error("Failed to send credentials to mentor {$user->email}: " . $e->getMessage());
+                Log::error("Failed to send credentials to mentor {$user->email}: " . $e->getMessage());
             }
         }
-        // -----------------------------------------------------
 
         return response()->json([
             'status' => 'success',
@@ -159,7 +150,6 @@ class AdminController extends Controller
             ], 404);
         }
 
-        // Mencegah admin mengubah akun admin lain/dirinya sendiri melalui endpoint ini
         if ($user->isAdmin()) {
             return response()->json([
                 'status' => 'error',
@@ -181,7 +171,7 @@ class AdminController extends Controller
                 'regex:/^[0-9\-\+\(\)]+$/', 'unique:users,phone_number,' . $id
             ],
             'gender' => 'nullable|in:male,female',
-            'role' => 'sometimes|in:user,mentor', // Tetap batasi hanya user dan mentor
+            'role' => 'sometimes|in:user,mentor',
             'is_premium' => 'sometimes|boolean'
         ]);
 
@@ -252,7 +242,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Suspend or Activate a user.
+     * Suspend or Activate a user and send notification email.
      */
     public function toggleStatus(Request $request, $id)
     {
@@ -285,9 +275,17 @@ class AdminController extends Controller
             $user->tokens()->delete();
         }
 
+        // --- TAMBAHAN: Kirim Email Pemberitahuan Status Akun ---
+        try {
+            Mail::to($user->email)->send(new UserStatusChangedMail($user, $newStatus));
+        } catch (\Exception $e) {
+            Log::error("Failed to send status change email to {$user->email}: " . $e->getMessage());
+        }
+        // -------------------------------------------------------
+
         return response()->json([
             'status' => 'success',
-            'message' => "User account has been {$newStatus} successfully.",
+            'message' => "User account has been {$newStatus} successfully and notification email sent.",
             'data' => [
                 'status' => $newStatus
             ]
@@ -299,7 +297,6 @@ class AdminController extends Controller
      */
     public function restore($id)
     {
-        // Gunakan withTrashed() untuk mencari user, termasuk yang sudah di-soft delete
         $user = User::withTrashed()->find($id);
 
         if (!$user) {
@@ -310,7 +307,6 @@ class AdminController extends Controller
             ], 404);
         }
 
-        // Cek apakah user sebenarnya sedang tidak dalam keadaan terhapus
         if (!$user->trashed()) {
             return response()->json([
                 'status' => 'error',
@@ -319,7 +315,6 @@ class AdminController extends Controller
             ], 400);
         }
 
-        // Kembalikan data user (kolom deleted_at akan di-set kembali menjadi NULL)
         $user->restore();
 
         return response()->json([
@@ -352,21 +347,15 @@ class AdminController extends Controller
             ], 403);
         }
 
-        // Pengecekan Premium & Pengiriman Email Refund Menggunakan Template Blade
         if ($user->is_premium) {
             try {
-                // Mengirim email menggunakan Mailable yang sudah dibuat
                 Mail::to($user->email)->send(new PremiumRefundMail($user));
             } catch (\Exception $e) {
-                // Log error jika email gagal terkirim, namun tetap lanjutkan proses delete
-                \Illuminate\Support\Facades\Log::error("Failed to send refund email to {$user->email}: " . $e->getMessage());
+                Log::error("Failed to send refund email to {$user->email}: " . $e->getMessage());
             }
         }
 
-        // Hapus semua token agar tidak bisa akses API lagi
         $user->tokens()->delete();
-        
-        // Soft Delete (akun masih ada di database karena ada use SoftDeletes di model User)
         $user->delete();
 
         return response()->json([

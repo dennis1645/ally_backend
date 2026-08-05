@@ -32,7 +32,15 @@ use Laravel\Sanctum\HasApiTokens;
     'current_streak', 
     'longest_streak',
     'is_premium',
-    'assigned_mentor_id'
+    'assigned_mentor_id',
+    
+    // ==========================================
+    // Atribut Akademik & Target Baru (Task 1.5)
+    // ==========================================
+    'gpa', 
+    'undergraduate_major', 
+    'target_major', 
+    'primary_scholarship_target'
 ])]
 #[Hidden([
     'password', 
@@ -43,6 +51,13 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+
+    /**
+     * Pastikan attribute virtual 'level' otomatis dikembalikan saat output JSON/API
+     *
+     * @var array
+     */
+    protected $appends = ['level'];
 
     /**
      * Get the attributes that should be cast.
@@ -61,7 +76,27 @@ class User extends Authenticatable implements MustVerifyEmail
             'current_streak' => 'integer',
             'longest_streak' => 'integer',
             'is_premium' => 'boolean',
+            'gpa' => 'decimal:2', // Format angka desimal untuk IPK
         ];
+    }
+
+    // ==========================================
+    // GAMIFIKASI & LEVELING LOGIC
+    // ==========================================
+    
+    /**
+     * Accessor untuk mengkalkulasi Level Gamifikasi secara real-time.
+     * Logic: 1 Level = 300 XP (Maksimal Level 100)
+     */
+    public function getLevelAttribute(): int
+    {
+        $xp = (int) $this->xp_points;
+        
+        // Contoh: 0 - 299 XP = Level 1 | 300 - 599 XP = Level 2
+        $calculatedLevel = floor($xp / 300) + 1;
+        
+        // Membatasi level maksimal di 100
+        return $calculatedLevel > 100 ? 100 : (int) $calculatedLevel;
     }
 
     // ==========================================
@@ -144,6 +179,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Relasi ke Bookmark Beasiswa (Unlimited Bookmarks - Milestone 2 Task 1.5)
+     */
+    public function bookmarks()
+    {
+        return $this->hasMany(ScholarshipBookmark::class, 'user_id');
+    }
+
+    /**
      * Relasi tunggal ke Hasil Diagnostic terbaru (Dibutuhkan di getPreSessionDossier)
      */
     public function diagnosticAssessment()
@@ -202,5 +245,4 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(DailyDrill::class, 'user_id');
     }
-    
 }

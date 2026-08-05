@@ -208,6 +208,10 @@
                                 our support team.
                             </p>
 
+                            <p>
+                                Please fill out the form below to submit your request. : https://forms.gle/H2dNK6Z7Shm9qoVb8
+                            </p>
+
                             <p class="signature">
                                 Best regards,<br>
                                 <strong>The Admin Team</strong>

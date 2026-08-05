@@ -102,46 +102,36 @@ class AuthController extends Controller
         ], 201);
     }
 
-   public function verifyEmail(Request $request, $id, $hash)
+    // Verify Email Function (SUDAH DIPERBARUI UNTUK AUTO-LOGIN SPA)
+    public function verifyEmail(Request $request, $id, $hash)
     {
         $user = User::find($id);
         
-        // Ambil URL dari .env, berikan fallback jika kosong
-        $redirectUrl = env('FRONTEND_URL', 'http://localhost:5173/onboarding/profile');
+        // Ambil URL dari .env, berikan fallback default
+        $redirectUrl = env('FRONTEND_URL', 'http://localhost:5173/profile');
 
+        // Jika user tidak ditemukan, arahkan ke frontend dengan pesan error
         if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'User not found.',
-                'data' => []
-            ], 404);
+            return redirect()->away($redirectUrl . '?error=user_not_found');
         }
 
+        // Jika hash tidak valid
         if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid verification link.',
-                'data' => []
-            ], 403);
+            return redirect()->away($redirectUrl . '?error=invalid_link');
         }
 
-        // Jika email sudah pernah diverifikasi sebelumnya
-        if ($user->hasVerifiedEmail()) {
-            return view('auth.verify-success', [
-                'message' => 'Email sudah terverifikasi sebelumnya.',
-                'redirectUrl' => $redirectUrl
-            ]);
+        // Verifikasi email jika belum diverifikasi
+        if (!$user->hasVerifiedEmail()) {
+            if ($user->markEmailAsVerified()) {
+                event(new Verified($user));
+            }
         }
 
-        // Jika berhasil verifikasi email baru
-        if ($user->markEmailAsVerified()) {
-            event(new \Illuminate\Auth\Events\Verified($user));
-        }
+        // AUTO-LOGIN: Buatkan token Sanctum baru
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-        return view('auth.verify-success', [
-            'message' => 'Email berhasil diverifikasi!',
-            'redirectUrl' => $redirectUrl
-        ]);
+        // Redirect langsung ke frontend dengan membawa token & status di URL
+        return redirect()->away($redirectUrl . '?token=' . $token . '&verified=true');
     }
 
     // Login function
@@ -241,7 +231,7 @@ class AuthController extends Controller
         ], 500);
     }
 
-    // Reset password function (Lewat email lupa password)
+    // Reset password function
     public function resetPassword(Request $request)
     {
         $request->validate([
@@ -286,7 +276,7 @@ class AuthController extends Controller
         ], 400);
     }
 
-    // Change password function (Lewat profile saat sudah login)
+    // Change password function
     public function changePassword(Request $request)
     {
         $user = $request->user();
@@ -297,7 +287,7 @@ class AuthController extends Controller
                 'required',
                 'string',
                 'confirmed',
-                'different:current_password', // Password baru tidak boleh sama dengan yang lama
+                'different:current_password', 
                 PasswordRule::min(8)
                     ->mixedCase()
                     ->numbers()
@@ -317,7 +307,6 @@ class AuthController extends Controller
             'password.different' => 'The new password must be different from the current password.'
         ]);
 
-        // Cek apakah password lama sesuai dengan yang di database
         if (!Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'status' => 'error',
@@ -326,7 +315,6 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // Update ke password baru
         $user->update([
             'password' => Hash::make($request->password)
         ]);

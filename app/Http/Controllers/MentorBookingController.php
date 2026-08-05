@@ -14,7 +14,7 @@ use App\Models\ConsultationBooking;
 class MentorBookingController extends Controller
 {
     /**
-     * MENTEE MELAKUKAN BOOKING JADWAL KONSULTASI 
+     * 1. MENTEE MELAKUKAN BOOKING JADWAL KONSULTASI 
      * (Eksklusif fasilitas akun premium, memotong 1 Token Mentor)
      */
     public function bookSession(Request $request)
@@ -25,7 +25,7 @@ class MentorBookingController extends Controller
 
         $authUser = Auth::user();
 
-        // 1. Cek apakah user adalah mentee (role user biasa)
+        // Cek apakah user adalah mentee (role user biasa)
         if ($authUser->role !== 'user') {
             return response()->json([
                 'status' => 'error',
@@ -33,7 +33,7 @@ class MentorBookingController extends Controller
             ], 403);
         }
 
-        // 2. Cek apakah user sudah berstatus premium
+        // Cek apakah user sudah berstatus premium
         if (!$authUser->is_premium) {
             return response()->json([
                 'status' => 'error',
@@ -43,25 +43,23 @@ class MentorBookingController extends Controller
 
         DB::beginTransaction();
         try {
-            // 3. Ambil data mentee dengan Pessimistic Lock untuk mencegah double-spend token
+            // Ambil data mentee dengan Pessimistic Lock
             $mentee = User::where('id', $authUser->id)->lockForUpdate()->first();
 
-            // Cek apakah mentee memiliki token yang cukup di dalam transaksi
             if ($mentee->token_balance < 1) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Token mentor Anda habis atau tidak mencukupi. Silakan beli paket token di Shop terlebih dahulu.'
-                ], 402); // 402 Payment Required
+                ], 402); 
             }
 
-            // 4. Ambil slot waktu dengan Pessimistic Lock untuk mencegah double-booking
+            // Ambil slot waktu dengan Pessimistic Lock
             $availability = MentorAvailability::with('mentor')
                 ->where('id', $request->availability_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // Cek apakah slot sudah dibooking orang lain di dalam transaksi
             if ($availability->is_booked) {
                 DB::rollBack();
                 return response()->json([
@@ -70,27 +68,26 @@ class MentorBookingController extends Controller
                 ], 400);
             }
 
-            // 5. Simpan Consultation Booking dengan histori potongan token
+            // Simpan Consultation Booking
             $booking = ConsultationBooking::create([
                 'mentee_id' => $mentee->id,
                 'mentor_id' => $availability->mentor_id,
                 'availability_id' => $availability->id,
                 'token_cost' => 1, 
                 'session_status' => 'pending',
-                'meeting_link' => null, 
+                'meeting_link' => null, // Akan diisi oleh mentor/admin nanti
             ]);
 
-            // 6. Tandai slot mentor sebagai ter-book
+            // Tandai slot mentor sebagai ter-book
             $availability->update(['is_booked' => true]);
 
-            // 7. Potong saldo token mentee (aman karena baris user sudah di-lock)
+            // Potong saldo token mentee
             $mentee->decrement('token_balance', 1);
 
             DB::commit();
 
-            // 8. Kirim Email Notifikasi ke Mentor secara otomatis (Dilakukan setelah commit agar tidak memblokir antrean database)
+            // Kirim Email Notifikasi ke Mentor (Opsional/Background)
             $mentor = $availability->mentor;
-
             try {
                 Mail::send('emails.mentor_booking_notification', [
                     'mentorName' => $mentor->name,
@@ -108,14 +105,14 @@ class MentorBookingController extends Controller
                 Log::warning('Gagal mengirim email notifikasi ke mentor: ' . $mailEx->getMessage());
             }
 
+            // Load relasi untuk response yang lebih informatif di frontend
+            $booking->load(['mentor:id,name', 'availability:id,available_date,start_time,end_time']);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Booking jadwal konsultasi berhasil dibuat! 1 Token telah dipotong.',
                 'data' => [
-                    'booking_id' => $booking->id,
-                    'mentor_id' => $booking->mentor_id,
-                    'availability_id' => $booking->availability_id,
-                    'session_status' => $booking->session_status,
+                    'booking_details' => $booking,
                     'remaining_tokens' => $mentee->token_balance, 
                 ]
             ], 201);
@@ -129,5 +126,37 @@ class MentorBookingController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * 2. MENTEE MELIHAT DAFTAR BOOKING MEREKA SENDIRI
+     * (Menampilkan info mentor, jadwal, status, dan link gmeet)
+     */
+    public function getMyBookings(Request $request)
+    {
+        $user = Auth::user();
+
+        // Ambil data booking milik mentee yang sedang login, beserta relasi mentor dan ketersediaan waktu
+        $bookings = ConsultationBooking::with([
+            'mentor:id,name,email,profile_picture_url', // Ambil data mentor yang diperlukan saja
+            'availability:id,available_date,start_time,end_time' // Ambil data jadwal
+        ])
+        ->where('mentee_id', $user->id)
+        ->orderBy('created_at', 'desc') // Urutkan dari yang terbaru dibuat
+        ->get();
+
+        if ($bookings->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Anda belum memiliki riwayat booking konsultasi.',
+                'data' => []
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Berhasil mengambil data riwayat booking.',
+            'data' => $bookings
+        ], 200);
     }
 }

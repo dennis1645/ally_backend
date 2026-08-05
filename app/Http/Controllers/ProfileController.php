@@ -27,12 +27,12 @@ class ProfileController extends Controller
         ]);
     }
 
-    // Mengupdate data profil
+    // Mengupdate data profil & informasi akademik / target beasiswa (Task 1.5)
     public function update(Request $request)
     {
         $user = $request->user();
 
-        // Validasi input dengan strict rules
+        // Validasi input dengan strict rules, termasuk field akademik & target beasiswa
         $validator = Validator::make($request->all(), [
             'name' => [
                 'sometimes', 
@@ -54,10 +54,17 @@ class ProfileController extends Controller
             'bio' => 'sometimes|string',
             'linkedin_id' => 'sometimes|string|max:255|unique:users,linkedin_id,' . $user->id,
             'profile_picture' => 'sometimes|file|image|mimes:jpeg,png,jpg|max:2048', 
+            
+            // Validasi Field Akademik & Target (Task 1.5)
+            'gpa' => 'sometimes|numeric|between:0.00,4.00',
+            'undergraduate_major' => 'sometimes|string|max:255',
+            'target_major' => 'sometimes|string|max:255',
+            'primary_scholarship_target' => 'sometimes|string|max:255',
         ], [
             // Custom pesan error bahasa Inggris
             'name.regex' => 'The name may only contain letters and spaces.',
-            'phone_number.regex' => 'The phone number format contains invalid characters.'
+            'phone_number.regex' => 'The phone number format contains invalid characters.',
+            'gpa.between' => 'The GPA must be a value between 0.00 and 4.00.'
         ]);
 
         if ($validator->fails()) {
@@ -71,9 +78,18 @@ class ProfileController extends Controller
         $validated = $validator->validated();
         $updateData = [];
 
-        // Filter field yang diizinkan
+        // Filter field yang diizinkan (termasuk atribut akademik & target)
         $allowedFields = [
-            'name', 'phone_number', 'gender', 'headline', 'bio', 'linkedin_id'
+            'name', 
+            'phone_number', 
+            'gender', 
+            'headline', 
+            'bio', 
+            'linkedin_id',
+            'gpa',
+            'undergraduate_major',
+            'target_major',
+            'primary_scholarship_target'
         ];
         
         foreach ($allowedFields as $field) {
@@ -107,7 +123,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Profile updated successfully.',
+            'message' => 'Profile and academic target updated successfully.',
             // Refresh data user, load badges, dan sembunyikan password
             'data' => $user->fresh()->load('badges')->makeHidden(['password'])
         ]);
