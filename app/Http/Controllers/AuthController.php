@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\DiagnosticAssessment;
+use App\Models\UserMilestone;
+use App\Services\GamificationService; // Tambahkan import ini
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // Tambahkan import DB
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -13,6 +17,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Validation\Rules\Password as PasswordRule;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -75,62 +80,145 @@ class AuthController extends Controller
                         }
                     }
                 }
-            ]
+            ],
+            'guest_token' => 'nullable|string'
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => strtolower($request->email),
-            'phone_number' => $request->phone_number,
-            'password' => Hash::make($request->password),
-            'role' => 'user',
-            'status' => 'active',
-        ]);
+        DB::beginTransaction(); // Mulai transaksi database
+        try {
+            // 1. Buat User Baru
+            $user = User::create([
+                'name' => $request->name,
+                'email' => strtolower($request->email),
+                'phone_number' => $request->phone_number,
+                'password' => Hash::make($request->password),
+                'role' => 'user',
+                'status' => 'active',
+            ]);
 
-        event(new Registered($user));
+            $isFirstMilestoneCompleted = false;
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            // 2. KLAIM HASIL ASESMEN GUEST (Jika guest_token ada)
+            if ($request->filled('guest_token')) {
+                $assessment = DiagnosticAssessment::where('guest_token', $request->guest_token)->first();
+                
+                if ($assessment) {
+                    // Assign asesmen ke user ini dan hapus token anonimnya
+                    $assessment->update([
+                        'user_id' => $user->id,
+                        'guest_token' => null
+                    ]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Registration successful. Please check your email for verification.',
-            'data' => [
-                'user' => $user,
-                'access_token' => $token,
-                'token_type' => 'Bearer'
-            ]
-        ], 201);
+                    // Update profil readiness_score user sesuai hasil asesmen
+                    $user->update([
+                        'readiness_score' => $assessment->overall_score
+                    ]);
+
+                    $isFirstMilestoneCompleted = true;
+                }
+            }
+
+            // 3. GENERATE AUTO-MILESTONE (TASK AWAL) UNTUK USER BARU
+            
+            // Milestone 1: Self Reflection
+            UserMilestone::create([
+                'user_id' => $user->id,
+                'task_name' => 'Fase 1: Self Reflection',
+                'description' => 'Complete the initial diagnostic assessment to map your strengths, weaknesses, and readiness.',
+                'step_order' => 1,
+                'is_premium' => false, 
+                'status' => $isFirstMilestoneCompleted ? 'completed' : 'pending',
+                'completed_at' => $isFirstMilestoneCompleted ? now() : null,
+                'target_deadline' => Carbon::now()->addDays(2),
+                'source' => 'system',
+                'is_mandatory' => true,
+                'xp_reward' => 50
+            ]);
+
+            // Milestone 2: Target Scholarship
+            UserMilestone::create([
+                'user_id' => $user->id,
+                'task_name' => 'Fase 2: Target Scholarship',
+                'description' => 'Set your academic goals and select the primary scholarship and university you want to aim for.',
+                'step_order' => 2,
+                'is_premium' => false,
+                'status' => 'pending',
+                'target_deadline' => Carbon::now()->addDays(5),
+                'source' => 'system',
+                'is_mandatory' => true,
+                'xp_reward' => 100
+            ]);
+
+            // Milestone 3: Reveal Your Mentor
+            UserMilestone::create([
+                'user_id' => $user->id,
+                'task_name' => 'Fase 3: Reveal Your Mentor',
+                'description' => 'Unlock and meet your dedicated AI/human mentor to guide your personalized scholarship journey.',
+                'step_order' => 3,
+                'is_premium' => false,
+                'status' => 'pending',
+                'target_deadline' => Carbon::now()->addDays(7),
+                'source' => 'system',
+                'is_mandatory' => true,
+                'xp_reward' => 150
+            ]);
+
+            // 4. BERIKAN REWARD XP JIKA BAWA GUEST TOKEN
+            $gamificationData = null;
+            if ($isFirstMilestoneCompleted) {
+                // Beri reward 50 XP sesuai dengan xp_reward dari Fase 1
+                $gamificationData = GamificationService::addXpAndCheckBadges($user, 50);
+            }
+
+            DB::commit(); // Simpan semua perubahan secara permanen
+
+            // Trigger Event & Buat Token (Dilakukan di luar DB transaction agar lebih aman)
+            event(new Registered($user));
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Registration successful. Welcome to your scholarship journey!',
+                'data' => [
+                    'user' => $user,
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                    'gamification' => $gamificationData // Kirim data naik level/badge ke frontend jika ada
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); // Batalkan semua jika ada gagal di tengah jalan
+            return response()->json([
+                'status' => 'error', 
+                'message' => 'Registration failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    // Verify Email Function (SUDAH DIPERBARUI UNTUK AUTO-LOGIN SPA)
+    // Verify Email Function
     public function verifyEmail(Request $request, $id, $hash)
     {
         $user = User::find($id);
         
-        // Ambil URL dari .env, berikan fallback default
         $redirectUrl = env('FRONTEND_URL', 'http://localhost:5173/profile');
 
-        // Jika user tidak ditemukan, arahkan ke frontend dengan pesan error
         if (!$user) {
             return redirect()->away($redirectUrl . '?error=user_not_found');
         }
 
-        // Jika hash tidak valid
         if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
             return redirect()->away($redirectUrl . '?error=invalid_link');
         }
 
-        // Verifikasi email jika belum diverifikasi
         if (!$user->hasVerifiedEmail()) {
             if ($user->markEmailAsVerified()) {
                 event(new Verified($user));
             }
         }
 
-        // AUTO-LOGIN: Buatkan token Sanctum baru
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Redirect langsung ke frontend dengan membawa token & status di URL
         return redirect()->away($redirectUrl . '?token=' . $token . '&verified=true');
     }
 

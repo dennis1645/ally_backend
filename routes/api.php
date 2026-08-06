@@ -28,7 +28,7 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
 
-// Public Routes
+// Public Routes (Including Public Diagnostic Hook for Onboarding)
 Route::middleware('throttle:60,1')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login'])->name('login');
@@ -37,6 +37,14 @@ Route::middleware('throttle:60,1')->group(function () {
 
     // Midtrans Webhook Callback (Publik, diakses langsung oleh server Midtrans)
     Route::post('/midtrans/webhook', [ShopController::class, 'webhook']);
+
+    // Diagnostic Assessment (Public Hook - Bisa diakses Guest maupun Logged In)
+    Route::prefix('diagnostic')->group(function () {
+        Route::get('/questions', [UserDiagnosticController::class, 'getQuestions']);
+        Route::post('/submit', [UserDiagnosticController::class, 'submitAssessment']);
+        // Endpoint my-result dipindahkan ke sini agar guest_token bisa lewat tanpa error 401/404
+        Route::get('/my-result', [UserDiagnosticController::class, 'getMyAssessment']); 
+    });
 });
 
 // Protected Routes (Requires Login)
@@ -54,7 +62,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
     // Endpoint Khusus Setup/Update Profil Akademik & Target (Task 1.5 Milestone 2)
-    // Bisa diarahkan ke fungsi update yang sama karena menggunakan validasi "sometimes"
     Route::post('/profile/academic-target', [ProfileController::class, 'update']);
     
     // University Module
@@ -102,13 +109,6 @@ Route::middleware('auth:sanctum')->group(function () {
             abort(500, 'Gagal memproses dan mendekripsi dokumen.');
         }
     })->name('document.download');
-
-    // Diagnostic Assessment (User Side)
-    Route::prefix('diagnostic')->group(function () {
-        Route::get('/questions', [UserDiagnosticController::class, 'getQuestions']);
-        Route::post('/submit', [UserDiagnosticController::class, 'submitAssessment']);
-        Route::get('/my-result', [UserDiagnosticController::class, 'getMyAssessment']);
-    });
 
     // Daily Drill (Micro-learning) Routes
     Route::prefix('daily-drills')->group(function () {

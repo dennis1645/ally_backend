@@ -31,6 +31,24 @@ class MilestoneController extends Controller
     }
 
     /**
+     * Helper: Mengecek apakah ada milestone sebelumnya yang belum selesai (Sequential Validation)
+     */
+    private function checkPreviousMilestonesCompleted($user, $milestone)
+    {
+        return UserMilestone::where('user_id', $user->id)
+            ->whereNull('parent_id') // Hanya cek task utama (root)
+            ->where('step_order', '<', $milestone->step_order)
+            ->where(function ($query) use ($milestone) {
+                // Sertakan task onboarding (scholarship_id null) dan task khusus beasiswa ini
+                $query->where('scholarship_id', $milestone->scholarship_id)
+                      ->orWhereNull('scholarship_id');
+            })
+            ->where('status', '!=', 'completed')
+            ->orderBy('step_order', 'asc')
+            ->first();
+    }
+
+    /**
      * GET: Mengambil daftar semua milestone / task timeline milik user (Mendukung Task Branching)
      */
     public function getTimeline(Request $request)
@@ -43,11 +61,14 @@ class MilestoneController extends Controller
         $scholarshipId = $request->scholarship_id;
 
         // MENGAMBIL TUGAS UTAMA (ROOT) BESERTA CABANGNYA (SUB-TASK)
+        // Termasuk mengambil onboarding milestone (scholarship_id = null) & beasiswa spesifik
         $milestones = UserMilestone::where('user_id', $user->id)
-            ->where('scholarship_id', $scholarshipId)
+            ->where(function ($query) use ($scholarshipId) {
+                $query->where('scholarship_id', $scholarshipId)
+                      ->orWhereNull('scholarship_id');
+            })
             ->whereNull('parent_id') // WAJIB: Hanya ambil tugas utama (bukan cabang)
-            ->with(['subTasks' => function($query) {
-                // Urutkan tugas cabang (dari mentor) berdasarkan deadline terdekat
+            ->with(['subTasks' => function ($query) {
                 $query->orderBy('target_deadline', 'asc');
             }])
             ->orderBy('step_order', 'asc')
@@ -71,6 +92,9 @@ class MilestoneController extends Controller
         ], 200);
     }
 
+    /**
+     * POST: Generate timeline lanjutan (Milestone 4+) menggunakan AI
+     */
     public function generateTimeline(Request $request)
     {
         $request->validate([
@@ -108,7 +132,7 @@ class MilestoneController extends Controller
             'current_date' => Carbon::now()->format('Y-m-d'),
             'deadline_date' => $deadline->format('Y-m-d'),
             'uploaded_docs' => $uploadedDocsStr,
-            'is_crash_course' => $sisa_hari < 30 ? true : false
+            'is_crash_course' => $sisa_hari < 30
         ];
 
         $aiResponse = $this->aiService->generate($payload);
@@ -122,26 +146,33 @@ class MilestoneController extends Controller
 
         $firstUniversityId = $scholarship->universities->first()->id ?? null;
 
+        // Ambil step_order tertinggi dari milestone dasar (Fase 1-3)
+        $baseStepOrder = UserMilestone::where('user_id', $user->id)
+            ->whereNull('scholarship_id')
+            ->whereNull('parent_id')
+            ->max('step_order') ?? 3;
+
         DB::beginTransaction();
         try {
-            // Hapus timeline lama untuk beasiswa ini (opsional tergantung flow aplikasi kamu)
+            // Hapus timeline beasiswa ini jika sebelumnya pernah dibuat ulang
             UserMilestone::where('user_id', $user->id)
                 ->where('scholarship_id', $scholarship->id)
                 ->delete();
 
             $milestonesToInsert = [];
             foreach ($aiResponse['milestones'] as $index => $task) {
-                $step_order = $index + 1;
+                // Milestone AI dimulai dari urutan ke-4 dst.
+                $step_order = $baseStepOrder + $index + 1; 
                 
                 $milestonesToInsert[] = [
                     'user_id'         => $user->id,
-                    'parent_id'       => null, // Secara default AI meng-generate tugas utama
+                    'parent_id'       => null,
                     'scholarship_id'  => $scholarship->id,
                     'university_id'   => $firstUniversityId,
                     'task_name'       => $task['task_name'],
                     'description'     => $task['description'] ?? null,
                     'step_order'      => $step_order,
-                    'is_premium'      => $task['is_premium'] ?? ($step_order > 3 ? true : false), 
+                    'is_premium'      => $task['is_premium'] ?? ($step_order > 3), 
                     'target_deadline' => Carbon::parse($task['target_deadline'])->format('Y-m-d'),
                     'status'          => 'pending',
                     'source'          => 'system',
@@ -187,7 +218,7 @@ class MilestoneController extends Controller
             'payment_status' => 'pending',
         ]);
 
-        $transactionDetail = TransactionDetail::create([
+        TransactionDetail::create([
             'transaction_id' => $transaction->id,
             'shop_item_id' => null,
             'price' => $grossAmount,
@@ -244,6 +275,31 @@ class MilestoneController extends Controller
             ], 404);
         }
 
+        // 1. Cek status saat ini
+        if ($milestone->status === 'completed') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Task ini sudah selesai dan tidak dapat diubah ke in_progress.'
+            ], 400);
+        }
+
+        if ($milestone->status === 'in_progress') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Task ini sudah berstatus in_progress.'
+            ], 400);
+        }
+
+        // 2. VALIDASI SEQUENTIAL (TIDAK BOLEH LOMPAT MILESTONE)
+        $previousIncomplete = $this->checkPreviousMilestonesCompleted($user, $milestone);
+        if ($previousIncomplete) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Anda belum dapat memulai task ini. Selesaikan milestone sebelumnya ('{$previousIncomplete->task_name}') terlebih dahulu."
+            ], 400);
+        }
+
+        // 3. Cek Status Premium
         if ($milestone->is_premium && !$user->is_premium) {
             try {
                 $paymentInfo = $this->createPremiumUnlockTransaction($user);
@@ -260,20 +316,6 @@ class MilestoneController extends Controller
                     'error' => $e->getMessage()
                 ], 500);
             }
-        }
-
-        if ($milestone->status === 'completed') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Task ini sudah selesai dan tidak dapat diubah ke in_progress.'
-            ], 400);
-        }
-
-        if ($milestone->status === 'in_progress') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Task ini sudah berstatus in_progress.'
-            ], 400);
         }
 
         $milestone->status = 'in_progress';
@@ -308,6 +350,24 @@ class MilestoneController extends Controller
             ], 404);
         }
 
+        // 1. Cek status saat ini
+        if ($milestone->status === 'completed') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Task ini sudah diselesaikan sebelumnya.'
+            ], 400);
+        }
+
+        // 2. VALIDASI SEQUENTIAL (TIDAK BOLEH LOMPAT MILESTONE)
+        $previousIncomplete = $this->checkPreviousMilestonesCompleted($user, $milestone);
+        if ($previousIncomplete) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Anda tidak dapat menyelesaikan task ini secara langsung. Selesaikan milestone sebelumnya ('{$previousIncomplete->task_name}') terlebih dahulu."
+            ], 400);
+        }
+
+        // 3. Cek Status Premium
         if ($milestone->is_premium && !$user->is_premium) {
             try {
                 $paymentInfo = $this->createPremiumUnlockTransaction($user);
@@ -324,13 +384,6 @@ class MilestoneController extends Controller
                     'error' => $e->getMessage()
                 ], 500);
             }
-        }
-
-        if ($milestone->status === 'completed') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Task ini sudah diselesaikan sebelumnya.'
-            ], 400);
         }
 
         DB::beginTransaction();
@@ -366,4 +419,4 @@ class MilestoneController extends Controller
             ], 500);
         }
     }
-}   
+}

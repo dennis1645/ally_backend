@@ -11,6 +11,8 @@ class DiagnosticAssessment extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_token',
+        'assessment_type',
         'overall_score',
         'academic_score',
         'goals_score',

@@ -10,6 +10,7 @@ class DiagnosticQuestion extends Model
     use HasFactory;
 
     protected $fillable = [
+        'assessment_type',
         'question_text',
         'category',
         'is_active',

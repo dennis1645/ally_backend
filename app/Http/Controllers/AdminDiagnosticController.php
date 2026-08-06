@@ -12,10 +12,16 @@ use App\Imports\DiagnosticQuestionsImport;
 
 class AdminDiagnosticController extends Controller
 {
-    // Display all questions along with their options
-    public function index()
+    // Display all questions along with their options (bisa difilter berdasarkan assessment_type jika ada query params)
+    public function index(Request $request)
     {
-        $questions = DiagnosticQuestion::with('options')->orderBy('order_number', 'asc')->get();
+        $query = DiagnosticQuestion::with('options')->orderBy('order_number', 'asc');
+
+        if ($request->has('assessment_type')) {
+            $query->where('assessment_type', $request->assessment_type);
+        }
+
+        $questions = $query->get();
 
         return response()->json([
             'status' => 'success',
@@ -58,9 +64,10 @@ class AdminDiagnosticController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic',
             'question_text' => 'required|string',
-            // Tambahan: Validasi ketat agar kategori tidak typo dan sesuai dengan sistem scoring
-            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness',
+            // Diperluas: menambahkan scholarship, financial, achievements, extracurricular, dan other
+            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness,scholarship,financial,achievements,extracurricular,other',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',
             'options.*.option_text' => 'required|string',
@@ -77,6 +84,7 @@ class AdminDiagnosticController extends Controller
         try {
             // 1. Create Question (Anti-XSS with strip_tags)
             $question = DiagnosticQuestion::create([
+                'assessment_type' => strip_tags($request->assessment_type),
                 'question_text' => strip_tags($request->question_text),
                 'category' => strip_tags($request->category),
                 'is_active' => true,
@@ -118,9 +126,10 @@ class AdminDiagnosticController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic',
             'question_text' => 'required|string',
-            // Tambahan: Validasi ketat agar kategori tidak typo
-            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness',
+            // Diperluas: menambahkan scholarship, financial, achievements, extracurricular, dan other
+            'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness,scholarship,financial,achievements,extracurricular,other',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',
             'options.*.option_text' => 'required|string',
@@ -137,6 +146,7 @@ class AdminDiagnosticController extends Controller
         try {
             // 1. Update the main question
             $question->update([
+                'assessment_type' => strip_tags($request->assessment_type),
                 'question_text' => strip_tags($request->question_text),
                 'category' => strip_tags($request->category),
                 'order_number' => $request->order_number ?? $question->order_number,

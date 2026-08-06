@@ -8,9 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. TABEL PERTANYAAN ASESMEN
+        // Tabel Pertanyaan Asesmen
         Schema::create('diagnostic_questions', function (Blueprint $table) {
             $table->id();
+            
+            // Penanda jenis asesmen (contoh: 'onboarding' untuk publik/sebelum register, atau 'initial_diagnostic' setelah login)
+            $table->string('assessment_type')->default('initial_diagnostic'); 
             
             // Menggunakan tipe 'text' karena beberapa pertanyaan memiliki contoh panjang (seperti Q7, Q8, Q9)
             $table->text('question_text');
@@ -20,12 +23,12 @@ return new class extends Migration
             
             $table->boolean('is_active')->default(true);
             
-            // order_number digunakan untuk mengurutkan pertanyaan 1 s/d 20 sebelum di-paginate
+            // order_number digunakan untuk mengurutkan pertanyaan sebelum di-paginate
             $table->integer('order_number')->default(0); 
             $table->timestamps();
         });
 
-        // 2. TABEL PILIHAN JAWABAN (OPSI)
+        // Tabel Pilihan Jawaban (Opsi)
         Schema::create('diagnostic_options', function (Blueprint $table) {
             $table->id();
             $table->foreignId('diagnostic_question_id')->constrained()->cascadeOnDelete();
@@ -40,25 +43,29 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 3. TABEL HASIL ASESMEN USER
+        // Tabel Hasil Asesmen User
         Schema::create('diagnostic_assessments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            
+            // Dibuat nullable agar bisa menampung hasil asesmen user guest (belum register)
+            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
+            
+            // Token unik dari browser (UUID/Guest Token) untuk mengamankan data guest agar tidak tertukar
+            $table->string('guest_token')->nullable()->index(); 
+            
+            // Penanda tipe hasil asesmen
+            $table->string('assessment_type')->default('initial_diagnostic'); 
             
             $table->integer('overall_score')->default(0); 
             
-            // ==========================================
-            // BREAKDOWN SKOR BERDASARKAN KATEGORI SOAL
-            // ==========================================
-            $table->integer('academic_score')->default(0);                  // Soal Pendidikan & IPK
-            $table->integer('goals_score')->default(0);                     // Soal Tujuan Beasiswa
-            $table->integer('leadership_experience_score')->default(0);     // Soal Organisasi & Prestasi
-            $table->integer('language_score')->default(0);                  // Soal Bahasa Inggris
-            $table->integer('application_readiness_score')->default(0);     // Soal Kesiapan Dokumen (CV/Essay) & Tantangan
+            // Breakdown skor berdasarkan kategori soal
+            $table->integer('academic_score')->default(0);                    // Soal Pendidikan & IPK
+            $table->integer('goals_score')->default(0);                      // Soal Tujuan Beasiswa
+            $table->integer('leadership_experience_score')->default(0);      // Soal Organisasi & Prestasi
+            $table->integer('language_score')->default(0);                   // Soal Bahasa Inggris
+            $table->integer('application_readiness_score')->default(0);      // Soal Kesiapan Dokumen (CV/Essay) & Tantangan
             
-            // ==========================================
-            // AI & RULE-BASED MAPPING OUTPUT
-            // ==========================================
+            // AI & Rule-based mapping output
             $table->json('weaknesses_mapping')->nullable(); 
             $table->json('strengths_mapping')->nullable();  
             $table->text('system_recommendation')->nullable(); 
