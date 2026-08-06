@@ -8,108 +8,56 @@ use Illuminate\Support\Facades\Log;
 class AIDiagnosticService
 {
     /**
-     * @param array $scores (Berisi array skor kategori dan overall_score)
-     * @param array $userData (IPK, jurusan, target, dll - jika ada)
-     * @param array $tags (Kumpulan weakness dan strength dari opsi yang dipilih)
+     * @param array $userAnswers (Kumpulan jawaban mentah yang dipilih user)
+     * @param array $userData (Data profil user, misal: IPK, jurusan target - jika ada)
      * @param string $assessmentType ('onboarding' atau 'initial_diagnostic')
      * @return array|null
      */
-    public function generateAnalysis(array $scores, array $userData, array $tags, string $assessmentType)
+    public function generateAnalysis(array $userAnswers, array $userData, string $assessmentType)
     {
-        // Asumsi nilai maksimal untuk keseluruhan asesmen
-        $maxOverallScore = 100; 
-
-        $prompt = $this->buildPrompt($scores, $maxOverallScore, $userData, $tags, $assessmentType);
-
         try {
-            // Mengambil API Key dari .env
-            $apiKey = env('GEMINI_API_KEY');
-            
-            // PERBAIKAN: Endpoint Google menggunakan Gemini 3.5 Flash
-            $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={$apiKey}";
+            $apiUrl = env('LLAMA_API_URL');
+            $apiKey = env('LLAMA_API_KEY'); 
 
-            // Request ke Google Gemini API
+            $payload = [
+                'assessment_type' => $assessmentType,
+                'user_data'       => $userData,
+                'answers'         => $userAnswers,
+            ];
+
+            // 1. Log payload yang dikirim ke AI
+            Log::info('Payload dikirim ke Llama API:', $payload);
+
             $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])->post($url, [
-                'systemInstruction' => [
-                    'parts' => [
-                        ['text' => 'Anda adalah AI Mentor Beasiswa yang ahli. Anda hanya boleh membalas dengan format JSON murni.']
-                    ]
-                ],
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.7,
-                    // Fitur keren Gemini: Memaksa output keluar sebagai JSON
-                    'responseMimeType' => 'application/json', 
-                ]
-            ]);
+                'Content-Type'  => 'application/json',
+                'Accept'        => 'application/json',
+                'ngrok-skip-browser-warning' => 'true',
+                'Authorization' => 'Bearer ' . $apiKey,
+            ])->timeout(60)
+            ->post($apiUrl, $payload);
 
             if ($response->successful()) {
-                // Cara parsing response JSON dari struktur Google Gemini
-                $content = $response->json('candidates.0.content.parts.0.text');
-                
-                // Karena kita sudah pakai responseMimeType JSON, biasanya output sudah bersih
-                // Tapi kita tetap antisipasi kalau ada markdown yang terbawa
-                $content = preg_replace('/```json|```/', '', $content);
-                
-                return json_decode(trim($content), true);
+                $responseData = $response->json();
+
+                // 2. LOG RESPON MENTAH DARI AI: Catat apa yang dikembalikan server AI
+                Log::info('Respons Mentah diterima dari Llama API:', [
+                    'status' => $response->status(),
+                    'body'   => $responseData
+                ]);
+
+                return $responseData;
             }
 
-            Log::error('AI Diagnostic API Error: ', $response->json());
+            // Jika API Llama error (misal 500 Internal Server Error)
+            Log::error('Llama 3.2 API Error Status: ' . $response->status(), [
+                'body' => $response->body()
+            ]);
+            
             return null;
 
         } catch (\Exception $e) {
             Log::error('AI Diagnostic Service Exception: ' . $e->getMessage());
             return null;
         }
-    }
-
-    private function buildPrompt(array $scores, int $maxOverallScore, array $userData, array $tags, string $assessmentType): string
-    {
-        $userDataStr = json_encode($userData);
-        $scoresStr = json_encode($scores);
-        $tagsStr = json_encode($tags);
-
-        $instruction = "";
-        if ($assessmentType === 'onboarding') {
-            $instruction = "Tipe asesmen ini adalah 'onboarding' (user belum mendaftar/login). 
-            Buat 'system_recommendation' (sekitar 2 paragraf pendek) yang SANGAT PERSUASIF. 
-            Sebutkan skor kesiapan mereka dalam format 'Angka Asli (Persentase%)', contoh: 'Skor kesiapanmu 45 (45%)'.
-            Validasi keinginan mereka, lalu ajak dan yakinkan mereka bahwa platform/mentor kami adalah tempat yang tepat untuk membantu mereka meningkatkan skor dan memenangkan beasiswa. Gunakan nada yang ramah dan suportif.";
-        } else {
-            $instruction = "Tipe asesmen ini adalah 'initial_diagnostic' (user sudah login dan menjadi member). 
-            Buat 'system_recommendation' yang lebih MENDALAM dan ACTIONABLE (3-4 paragraf). 
-            Sebutkan skor mereka dalam format 'Angka Asli (Persentase%)'. 
-            Berikan langkah-langkah konkret apa yang harus mereka perbaiki berdasarkan 'weaknesses' yang mereka miliki, dan bagaimana cara memaksimalkan 'strengths' mereka.";
-        }
-
-        return <<<PROMPT
-Analisis profil calon pelamar beasiswa ini berdasarkan data berikut:
-
-Data User: $userDataStr
-Skor Mentah (Raw Scores): $scoresStr
-Skor Maksimal Keseluruhan: $maxOverallScore
-Tags yang didapat dari jawaban: $tagsStr
-
-Instruksi Khusus:
-$instruction
-
-Gabungkan tags yang relevan, atau tambahkan tags kelemahan/kekuatan baru jika kamu melihat pola dari data tersebut.
-
-KEMBALIKAN OUTPUT STRICT DALAM FORMAT JSON BERIKUT (Gunakan Bahasa Indonesia):
-{
-    "weaknesses_mapping": ["kelemahan1", "kelemahan2", "kelemahan3"],
-    "strengths_mapping": ["kekuatan1", "kekuatan2"],
-    "system_recommendation": "Teks rekomendasi Anda di sini sesuai instruksi..."
-}
-PROMPT;
     }
 }

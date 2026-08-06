@@ -12,18 +12,15 @@ return new class extends Migration
         Schema::create('diagnostic_questions', function (Blueprint $table) {
             $table->id();
             
-            // Penanda jenis asesmen (contoh: 'onboarding' untuk publik/sebelum register, atau 'initial_diagnostic' setelah login)
+            // Penanda jenis asesmen ('onboarding' atau 'initial_diagnostic')
             $table->string('assessment_type')->default('initial_diagnostic'); 
             
-            // Menggunakan tipe 'text' karena beberapa pertanyaan memiliki contoh panjang (seperti Q7, Q8, Q9)
             $table->text('question_text');
             
-            // Kategori internal untuk sistem memecah skor (academic, goals, leadership, language, readiness)
+            // Kategori soal (academic, scholarship_goal, leadership, achievements, english, application)
             $table->string('category'); 
             
             $table->boolean('is_active')->default(true);
-            
-            // order_number digunakan untuk mengurutkan pertanyaan sebelum di-paginate
             $table->integer('order_number')->default(0); 
             $table->timestamps();
         });
@@ -34,41 +31,44 @@ return new class extends Migration
             $table->foreignId('diagnostic_question_id')->constrained()->cascadeOnDelete();
             
             $table->string('option_text');
-            $table->integer('score_weight')->default(0); // Bobot nilai jika user memilih jawaban ini
             
-            // Tag untuk mapping kelemahan/kekuatan otomatis oleh Rule-based scoring AI
+            // Bobot dan tag masih bisa dipertahankan sebagai konteks tambahan untuk dikirim ke Prompt AI
+            $table->integer('score_weight')->default(0); 
             $table->string('weakness_tag')->nullable(); 
             $table->string('strength_tag')->nullable(); 
             
             $table->timestamps();
         });
 
-        // Tabel Hasil Asesmen User
+        // Tabel Hasil Asesmen User (UPDATED FOR AI INTEGRATION)
         Schema::create('diagnostic_assessments', function (Blueprint $table) {
             $table->id();
             
-            // Dibuat nullable agar bisa menampung hasil asesmen user guest (belum register)
+            // Relasi User / Guest
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
-            
-            // Token unik dari browser (UUID/Guest Token) untuk mengamankan data guest agar tidak tertukar
             $table->string('guest_token')->nullable()->index(); 
-            
-            // Penanda tipe hasil asesmen
             $table->string('assessment_type')->default('initial_diagnostic'); 
             
-            $table->integer('overall_score')->default(0); 
+            // ---------------------------------------------------
+            // DATA HASIL GENERATE AI GEMINI
+            // ---------------------------------------------------
             
-            // Breakdown skor berdasarkan kategori soal
-            $table->integer('academic_score')->default(0);                    // Soal Pendidikan & IPK
-            $table->integer('goals_score')->default(0);                      // Soal Tujuan Beasiswa
-            $table->integer('leadership_experience_score')->default(0);      // Soal Organisasi & Prestasi
-            $table->integer('language_score')->default(0);                   // Soal Bahasa Inggris
-            $table->integer('application_readiness_score')->default(0);      // Soal Kesiapan Dokumen (CV/Essay) & Tantangan
+            // Skor Keseluruhan & Level
+            $table->integer('readiness_percentage')->default(0); 
+            $table->string('readiness_level')->nullable(); // cth: "Strong Foundation"
             
-            // AI & Rule-based mapping output
-            $table->json('weaknesses_mapping')->nullable(); 
-            $table->json('strengths_mapping')->nullable();  
-            $table->text('system_recommendation')->nullable(); 
+            // Breakdown skor kategori (Sesuai objek JSON "categories" dari AI)
+            $table->integer('academic_score')->default(0);            // Untuk "academic"
+            $table->integer('scholarship_goal_score')->default(0);    // Untuk "scholarship_goal"
+            $table->integer('leadership_score')->default(0);          // Untuk "leadership"
+            $table->integer('achievements_score')->default(0);        // Untuk "achievements"
+            $table->integer('english_score')->default(0);             // Untuk "english"
+            $table->integer('application_score')->default(0);         // Untuk "application"
+            
+            // Array output AI untuk kekuatan dan area improvisasi
+            $table->json('strengths_mapping')->nullable();            // Untuk "strengths"
+            $table->json('improvements_mapping')->nullable();         // Untuk "improvements"
+            $table->text('reason')->nullable(); 
             
             $table->timestamps();
         });

@@ -57,7 +57,9 @@ return new class extends Migration
             $table->integer('xp_points')->default(0); 
             // Level tidak dimasukkan ke DB, melainkan di-generate dinamis di Model via Accessor!
             $table->integer('current_streak')->default(0); 
+            $table->boolean('is_streak_frozen')->default(false); // Dihapus ->after()-nya
             $table->integer('longest_streak')->default(0); 
+            
             
             $table->rememberToken();
             $table->timestamps();

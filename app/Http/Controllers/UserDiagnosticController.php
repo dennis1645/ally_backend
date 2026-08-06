@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\DiagnosticQuestion;
 use App\Models\DiagnosticOption;
 use App\Models\DiagnosticAssessment;
+use App\Models\User;
 use App\Services\GamificationService;
-use App\Services\AIDiagnosticService; // Import AI Service
+use App\Services\AIDiagnosticService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +28,11 @@ class UserDiagnosticController extends Controller
      */
     public function getQuestions(Request $request)
     {
-        // Tentukan tipe asesmen melalui query parameter (default: initial_diagnostic)
         $assessmentType = $request->query('assessment_type', 'initial_diagnostic');
 
         $questions = DiagnosticQuestion::where('is_active', true)
             ->where('assessment_type', $assessmentType)
             ->with(['options' => function($query) {
-                // Sembunyikan score_weight, weakness_tag, dan strength_tag dari frontend
                 $query->select('id', 'diagnostic_question_id', 'option_text');
             }])
             ->orderBy('order_number', 'asc')
@@ -50,10 +49,8 @@ class UserDiagnosticController extends Controller
      */
     public function submitAssessment(Request $request)
     {
-        // PENTING: Panggil guard Sanctum secara eksplisit untuk membaca token di rute publik
         $user = Auth::guard('sanctum')->user(); 
 
-        // Aturan validasi dinamis berdasarkan status login dan jenis asesmen
         $rules = [
             'assessment_type' => 'required|string|in:onboarding,initial_diagnostic',
             'answers' => 'required|array',
@@ -61,11 +58,9 @@ class UserDiagnosticController extends Controller
             'answers.*.option_id' => 'required|exists:diagnostic_options,id',
         ];
 
-        // Jika user belum login (guest), wajib menyertakan guest_token
         if (!$user) {
             $rules['guest_token'] = 'required|string';
         } else {
-            // Jika user sudah login, data akademik bersifat opsional
             $rules['gpa'] = 'nullable|numeric|between:0.00,4.00';
             $rules['undergraduate_major'] = 'nullable|string|max:255';
             $rules['target_major'] = 'nullable|string|max:255';
@@ -78,20 +73,32 @@ class UserDiagnosticController extends Controller
             return response()->json(['status' => 'error', 'errors' => $validator->errors()], 422);
         }
 
-        // Inisialisasi variabel perhitungan skor
-        $overallScore = 0;
-        $scores = [
-            'academic' => 0,
-            'goals' => 0,
-            'leadership_experience' => 0,
-            'language' => 0,
-            'application_readiness' => 0
+        // Mapping key persis seperti format yang diminta oleh AI
+        $keyMap = [
+            1  => 'q1_current_status',
+            2  => 'q2_gpa_range',
+            3  => 'q3_undergraduate_field',
+            4  => 'q4_master_interest',
+            5  => 'q5_scholarship_direction',
+            6  => 'q6_application_timeline',
+            7  => 'q7_leadership_experience',
+            8  => 'q8_impact_experience',
+            9  => 'q9_recognized_programs',
+            10 => 'q10_achievements',
+            11 => 'q11_skill_profile',
+            12 => 'q12_english_certificate',
+            13 => 'q13_storytelling_confidence',
+            14 => 'q14_cv_status',
+            15 => 'q15_essay_status',
+            16 => 'q16_application_knowledge',
+            17 => 'q17_previous_application',
+            18 => 'q18_rejection_analysis',
+            19 => 'q19_biggest_challenge',
+            20 => 'q20_cv_upload',
         ];
-        
-        $weaknesses = [];
-        $strengths = [];
 
-        // Proses setiap jawaban
+        $userAnswersForAI = [];
+
         foreach ($request->answers as $answer) {
             $question = DiagnosticQuestion::find($answer['question_id']);
             $option = DiagnosticOption::find($answer['option_id']);
@@ -100,30 +107,10 @@ class UserDiagnosticController extends Controller
                 continue;
             }
 
-            $overallScore += $option->score_weight;
-
-            $category = strtolower($question->category);
-            if (array_key_exists($category, $scores)) {
-                $scores[$category] += $option->score_weight;
-            }
-
-            if (!empty($option->weakness_tag)) {
-                $weaknesses[] = $option->weakness_tag;
-            }
-            if (!empty($option->strength_tag)) {
-                $strengths[] = $option->strength_tag;
-            }
+            $questionKey = $keyMap[$question->order_number] ?? ('q' . $question->order_number);
+            $userAnswersForAI[$questionKey] = $option->option_text;
         }
 
-        // Bersihkan duplikasi tag
-        $weaknesses = array_values(array_unique($weaknesses));
-        $strengths = array_values(array_unique($strengths));
-
-        // -------------------------------------------------------------
-        // BLOK EKSEKUSI AI DIAGNOSTIC SERVICE
-        // -------------------------------------------------------------
-        
-        // Siapkan data user untuk AI (jika ada)
         $userDataForAI = [
             'gpa' => $request->gpa ?? null,
             'undergraduate_major' => $request->undergraduate_major ?? null,
@@ -131,24 +118,32 @@ class UserDiagnosticController extends Controller
             'scholarship_target' => $request->primary_scholarship_target ?? null,
         ];
 
-        // Gabungkan skor keseluruhan dengan skor per kategori
-        $scoresForAI = array_merge(['overall' => $overallScore], $scores);
-        $tagsForAI = ['weaknesses' => $weaknesses, 'strengths' => $strengths];
-
-        // Panggil service AI
-        $aiResult = $this->aiDiagnosticService->generateAnalysis(
-            $scoresForAI, 
+        $aiResponse = $this->aiDiagnosticService->generateAnalysis(
+            $userAnswersForAI, 
             $userDataForAI, 
-            $tagsForAI, 
             $request->assessment_type
         );
 
-        // Fallback jika API AI gagal, timeout, atau limit habis
-        if (!$aiResult) {
-            $aiResult = [
-                'weaknesses_mapping' => $weaknesses,
-                'strengths_mapping' => $strengths,
-                'system_recommendation' => "Terjadi kendala saat menganalisis profilmu menggunakan AI. Namun berdasarkan skor dasar $overallScore, kamu memiliki potensi yang sangat baik. Mari mulai kembangkan langkahmu bersama mentor kami."
+        // -----------------------------------------------------------------
+        // [PERBAIKAN] UNPACK RESPONS SESUAI FORMAT BARU DARI AI ENGINEER
+        // -----------------------------------------------------------------
+        // AI membungkus data di dalam ['data']['assessment']
+        $aiData = $aiResponse['data']['assessment'] ?? $aiResponse['data'] ?? $aiResponse;
+
+        // Fallback jika API AI gagal
+        if (!$aiResponse || empty($aiData) || (isset($aiResponse['status']) && $aiResponse['status'] !== 'success')) {
+            $aiData = [
+                'readiness_percentage' => 0,
+                'readiness_level' => 'Unassessed',
+                'reason' => 'Gagal terhubung ke server AI saat menganalisis.',
+                'academic_score' => 0,
+                'scholarship_goal_score' => 0, 
+                'leadership_score' => 0,
+                'achievements_score' => 0, 
+                'english_score' => 0, 
+                'application_score' => 0,
+                'strengths_mapping' => [],
+                'improvements_mapping' => ['Gagal terhubung ke server AI saat menganalisis. Silakan coba lagi.'],
             ];
         }
 
@@ -157,19 +152,24 @@ class UserDiagnosticController extends Controller
             // Siapkan payload data untuk tabel diagnostic_assessments
             $assessmentData = [
                 'assessment_type' => $request->assessment_type,
-                'overall_score' => $overallScore,
-                'academic_score' => $scores['academic'],
-                'goals_score' => $scores['goals'],
-                'leadership_experience_score' => $scores['leadership_experience'],
-                'language_score' => $scores['language'],
-                'application_readiness_score' => $scores['application_readiness'],
-                // Encode hasil array dari AI ke format JSON untuk disimpan ke database
-                'weaknesses_mapping' => json_encode($aiResult['weaknesses_mapping']),
-                'strengths_mapping' => json_encode($aiResult['strengths_mapping']),
-                'system_recommendation' => $aiResult['system_recommendation']
+                
+                'readiness_percentage' => $aiData['readiness_percentage'] ?? 0,
+                'readiness_level' => $aiData['readiness_level'] ?? null,
+                'reason' => $aiData['reason'] ?? null, 
+                
+                // Ambil nilai skor secara langsung (karena AI tidak lagi pakai key 'categories')
+                'academic_score' => $aiData['academic_score'] ?? 0,
+                'scholarship_goal_score' => $aiData['scholarship_goal_score'] ?? 0,
+                'leadership_score' => $aiData['leadership_score'] ?? 0,
+                'achievements_score' => $aiData['achievements_score'] ?? 0,
+                'english_score' => $aiData['english_score'] ?? 0,
+                'application_score' => $aiData['application_score'] ?? 0,
+                
+                // Ambil strength dan improvement sesuai penamaan baru dari AI
+                'strengths_mapping' => $aiData['strengths_mapping'] ?? $aiData['strengths'] ?? [],
+                'improvements_mapping' => $aiData['improvements_mapping'] ?? $aiData['improvements'] ?? [],
             ];
 
-            // Simpan berdasarkan kepemilikan user atau guest_token
             if ($user) {
                 $assessmentData['user_id'] = $user->id;
                 $assessmentData['guest_token'] = null;
@@ -196,10 +196,9 @@ class UserDiagnosticController extends Controller
 
             $gamificationData = null;
 
-            // Update profil dan jalankan gamifikasi HANYA jika user sudah login
             if ($user) {
                 $userUpdateData = [
-                    'readiness_score' => $overallScore
+                    'readiness_score' => $aiData['readiness_percentage'] ?? 0
                 ];
 
                 if ($request->filled('gpa')) {
@@ -217,16 +216,11 @@ class UserDiagnosticController extends Controller
 
                 $user->update($userUpdateData);
 
-                // Berikan reward XP gamifikasi untuk penyelesaian asesmen
                 $xpReward = 50; 
                 $gamificationData = GamificationService::addXpAndCheckBadges($user, $xpReward);
             }
 
             DB::commit();
-
-            // Decode kembali JSON agar output di response API berbentuk array (lebih mudah di-parsing Frontend)
-            $assessment->weaknesses_mapping = json_decode($assessment->weaknesses_mapping);
-            $assessment->strengths_mapping = json_decode($assessment->strengths_mapping);
 
             return response()->json([
                 'status' => 'success',
@@ -249,14 +243,12 @@ class UserDiagnosticController extends Controller
      */
     public function getMyAssessment(Request $request)
     {
-        // PENTING: Gunakan guard Sanctum untuk cek sesi secara mandiri
         $user = Auth::guard('sanctum')->user();
         $assessmentType = $request->query('assessment_type', 'initial_diagnostic');
-        $guestToken = $request->query('guest_token'); // Tangkap langsung dari query
+        $guestToken = $request->query('guest_token'); 
 
         $assessment = null;
 
-        // Validasi awal: Jika tidak ada token login dan tidak ada guest_token, tolak akses.
         if (!$user && !$guestToken) {
             return response()->json([
                 'status' => 'error',
@@ -264,21 +256,18 @@ class UserDiagnosticController extends Controller
             ], 401);
         }
 
-        // PRIORITAS 1: Jika request secara eksplisit membawa `guest_token`, cari menggunakan token itu
         if ($guestToken) {
             $assessment = DiagnosticAssessment::where('guest_token', $guestToken)
                 ->where('assessment_type', $assessmentType)
                 ->first();
         }
 
-        // PRIORITAS 2: Jika tidak ketemu (atau tidak ada guest_token), tapi user sedang login, cari berdasar ID
         if (!$assessment && $user) {
             $assessment = DiagnosticAssessment::where('user_id', $user->id)
                 ->where('assessment_type', $assessmentType)
                 ->first();
         }
 
-        // Jika dicari pakai dua cara di atas tapi tetap tidak ada di database
         if (!$assessment) {
             return response()->json([
                 'status' => 'error',
@@ -286,17 +275,9 @@ class UserDiagnosticController extends Controller
             ], 404);
         }
 
-        // Decode JSON mapping saat diambil 
-        $assessment->weaknesses_mapping = is_string($assessment->weaknesses_mapping) 
-            ? json_decode($assessment->weaknesses_mapping) 
-            : $assessment->weaknesses_mapping;
-            
-        $assessment->strengths_mapping = is_string($assessment->strengths_mapping) 
-            ? json_decode($assessment->strengths_mapping) 
-            : $assessment->strengths_mapping;
-
         return response()->json([
             'status' => 'success',
+            'message' => 'Assessment result retrieved successfully.',
             'data' => $assessment
         ]);
     }

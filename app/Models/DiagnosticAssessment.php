@@ -13,21 +13,28 @@ class DiagnosticAssessment extends Model
         'user_id',
         'guest_token',
         'assessment_type',
-        'overall_score',
+        'reason',
+        // Data utama hasil AI
+        'readiness_percentage',
+        'readiness_level',
+        
+        // Breakdown skor kategori dari AI
         'academic_score',
-        'goals_score',
-        'leadership_experience_score',
-        'language_score',
-        'application_readiness_score',
-        'weaknesses_mapping',
+        'scholarship_goal_score',
+        'leadership_score',
+        'achievements_score',
+        'english_score',
+        'application_score',
+        
+        // Array mapping AI
         'strengths_mapping',
-        'system_recommendation'
+        'improvements_mapping'
     ];
 
-    // Mengubah data JSON secara otomatis menjadi Array di PHP
+    // Mengubah data JSON di database secara otomatis menjadi Array di PHP
     protected $casts = [
-        'weaknesses_mapping' => 'array',
         'strengths_mapping' => 'array',
+        'improvements_mapping' => 'array',
     ];
 
     // Relasi ke user yang mengerjakan asesmen (Belongs To)

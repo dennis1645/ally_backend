@@ -1,8 +1,23 @@
 <?php
 
 use Illuminate\Support\Facades\Schedule;
-use App\Models\ConsultationBooking;
 use Illuminate\Support\Facades\Log;
+use App\Models\ConsultationBooking;
+
+/*
+|--------------------------------------------------------------------------
+| Console Routes
+|--------------------------------------------------------------------------
+|
+| This file is where you may define all of your Closure based console
+| commands. Each Closure is bound to a command instance allowing a
+| simple approach to interacting with each command's IO methods.
+|
+*/
+
+// Task 1: Smart Nudge Reminders (Gamifikasi & Email Pengingat Milestone/Subtask)
+Schedule::command('nudge:send-reminders')->dailyAt('07:00');
+
 
 // Task 2.3: Auto-Close Sesi Mentoring yang Lewat Batas Waktu
 Schedule::call(function () {

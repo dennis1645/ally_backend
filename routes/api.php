@@ -179,6 +179,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ADMIN MODULE (Admin Only)
     Route::middleware('role:admin')->prefix('admin')->group(function () {
+
+    Route::get('/admin/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
         
         // User Management
         Route::get('/get-users', [AdminController::class, 'index']); 
