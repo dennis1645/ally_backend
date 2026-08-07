@@ -10,14 +10,25 @@ class AIDiagnosticService
     /**
      * @param array $userAnswers (Kumpulan jawaban mentah yang dipilih user)
      * @param array $userData (Data profil user, misal: IPK, jurusan target - jika ada)
-     * @param string $assessmentType ('onboarding' atau 'initial_diagnostic')
+     * @param string $assessmentType ('onboarding', 'initial_diagnostic', atau 'assessment_2')
      * @return array|null
      */
     public function generateAnalysis(array $userAnswers, array $userData, string $assessmentType)
     {
         try {
-            $apiUrl = env('LLAMA_API_URL');
-            $apiKey = env('LLAMA_API_KEY'); 
+            // Ambil Base URL dari .env (Contoh: https://bodacious-armed-tightwad.ngrok-free.dev/api/)
+            $baseUrl = env('LLAMA_API_URL');
+            $apiKey  = env('LLAMA_API_KEY'); 
+
+            // Tentukan Endpoint khusus berdasarkan jenis assessment
+            $endpoint = match ($assessmentType) {
+                'onboarding', 'initial_diagnostic' => 'assessment/readiness',
+                'assessment_2', 'deep_diagnostic'  => 'assessment/deep', // Silakan ubah 'assessment/deep' sesuai endpoint asli AI Engineer-mu
+                default                            => 'assessment/readiness', // Fallback default
+            };
+
+            // Gabungkan Base URL dan Endpoint dengan aman (menghindari double slash '//')
+            $fullApiUrl = rtrim($baseUrl, '/') . '/' . ltrim($endpoint, '/');
 
             $payload = [
                 'assessment_type' => $assessmentType,
@@ -25,8 +36,8 @@ class AIDiagnosticService
                 'answers'         => $userAnswers,
             ];
 
-            // 1. Log payload yang dikirim ke AI
-            Log::info('Payload dikirim ke Llama API:', $payload);
+            // 1. Log payload dan URL target yang dikirim ke AI
+            Log::info("Payload dikirim ke Llama API [Target: {$fullApiUrl}]:", $payload);
 
             $response = Http::withHeaders([
                 'Content-Type'  => 'application/json',
@@ -34,7 +45,7 @@ class AIDiagnosticService
                 'ngrok-skip-browser-warning' => 'true',
                 'Authorization' => 'Bearer ' . $apiKey,
             ])->timeout(60)
-            ->post($apiUrl, $payload);
+            ->post($fullApiUrl, $payload); // Kirim ke URL yang sudah digabung
 
             if ($response->successful()) {
                 $responseData = $response->json();
@@ -48,8 +59,9 @@ class AIDiagnosticService
                 return $responseData;
             }
 
-            // Jika API Llama error (misal 500 Internal Server Error)
+            // Jika API Llama error (misal 500 Internal Server Error atau 404 Not Found)
             Log::error('Llama 3.2 API Error Status: ' . $response->status(), [
+                'url'  => $fullApiUrl,
                 'body' => $response->body()
             ]);
             

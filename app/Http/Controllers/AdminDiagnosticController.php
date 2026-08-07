@@ -64,9 +64,9 @@ class AdminDiagnosticController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic',
+            // PERBAIKAN: Menambahkan deep_diagnostic ke aturan validasi
+            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic,deep_diagnostic',
             'question_text' => 'required|string',
-            // Diperluas: menambahkan scholarship, financial, achievements, extracurricular, dan other
             'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness,scholarship,financial,achievements,extracurricular,other',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',
@@ -126,9 +126,9 @@ class AdminDiagnosticController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic',
+            // PERBAIKAN: Menambahkan deep_diagnostic ke aturan validasi
+            'assessment_type' => 'required|string|in:onboarding,initial_diagnostic,deep_diagnostic',
             'question_text' => 'required|string',
-            // Diperluas: menambahkan scholarship, financial, achievements, extracurricular, dan other
             'category' => 'required|string|in:academic,goals,leadership_experience,language,application_readiness,scholarship,financial,achievements,extracurricular,other',
             'order_number' => 'nullable|integer',
             'options' => 'required|array|min:2',

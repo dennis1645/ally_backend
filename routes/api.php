@@ -22,6 +22,8 @@ use App\Http\Controllers\DailyDrillController;
 use App\Http\Controllers\AdminBadgeController; 
 use App\Http\Controllers\MentorDocumentController;
 use App\Http\Controllers\BookmarkController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\UserDeepDiagnosticController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -59,6 +61,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('bookmarks')->group(function () {
         Route::get('/', [BookmarkController::class, 'index']); // Get list bookmark
         Route::post('/toggle', [BookmarkController::class, 'toggleBookmark']); // Add / Remove bookmark
+    });
+
+    Route::prefix('deep-diagnostic')->group(function () {
+        Route::get('/questions', [UserDeepDiagnosticController::class, 'getQuestions']);
+        Route::post('/submit', [UserDeepDiagnosticController::class, 'submitAssessment']);
+        Route::get('/my-result', [UserDeepDiagnosticController::class, 'getMyAssessment']); 
     });
     
     // Endpoint Khusus Setup/Update Profil Akademik & Target (Task 1.5 Milestone 2)
@@ -180,7 +188,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ADMIN MODULE (Admin Only)
     Route::middleware('role:admin')->prefix('admin')->group(function () {
 
-    Route::get('/admin/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
+    Route::get('/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
         
         // User Management
         Route::get('/get-users', [AdminController::class, 'index']); 

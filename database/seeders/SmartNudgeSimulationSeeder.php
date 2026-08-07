@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\UserMilestone;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash; // Wajib di-import untuk Hash password
 
 class SmartNudgeSimulationSeeder extends Seeder
 {
@@ -20,17 +21,17 @@ class SmartNudgeSimulationSeeder extends Seeder
         $user = User::updateOrCreate(
             ['email' => 'jokowi.user@gmail.com'],
             [
-                'id' => 4,
+                // ID dihilangkan agar MySQL bebas mengatur Auto Increment dan tidak bentrok
                 'name' => 'Jokowi dodo',
                 'phone_number' => '084444444444',
-                'password' => '$2y$12$N0r8Z69B0y78EiZb0Xw/S.75dm8KfFgRhsHiJ3cik0e...',
+                'password' => Hash::make('password123'), // Perbaikan: Menggunakan Hash::make
                 'email_verified_at' => now(),
                 'role' => 'user',
                 'status' => 'active',
                 'current_streak' => 5,
                 'is_streak_frozen' => false,
-                'created_at' => '2026-08-06 05:00:58',
-                'updated_at' => '2026-08-06 05:00:58',
+                'created_at' => now(),
+                'updated_at' => now(),
             ]
         );
 
@@ -71,7 +72,7 @@ class SmartNudgeSimulationSeeder extends Seeder
             'status' => 'pending',
         ]);
 
-        // Diubah menggunakan $this->command->info()
-        $this->command->info("Seeder Smart Nudge berhasil dijalankan untuk user: {$user->name}");
+        $this->command->info("✅ Seeder Smart Nudge berhasil dijalankan untuk user: {$user->name}");
+        $this->command->info("👉 Disiapkan 4 milestone (H-3, H-1, Hari H, dan H+1) untuk memicu semua email dan Freeze Streak.");
     }
 }

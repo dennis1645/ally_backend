@@ -12,10 +12,10 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 class DiagnosticQuestionsImport implements ToCollection, WithHeadingRow
 {
     /**
-    * Menerima seluruh baris data Excel.
-    * Format Kolom Excel yang dibutuhkan:
-    * question_text | category | order_number | option_text | score_weight | weakness_tag | strength_tag
-    */
+     * Menerima seluruh baris data Excel.
+     * Format Kolom Excel yang dibutuhkan:
+     * assessment_type | question_text | category | order_number | option_text | score_weight | weakness_tag | strength_tag
+     */
     public function collection(Collection $rows)
     {
         DB::beginTransaction();
@@ -30,11 +30,13 @@ class DiagnosticQuestionsImport implements ToCollection, WithHeadingRow
                     continue; 
                 }
 
-                $questionText = trim(strip_tags($row['question_text']));
+                $questionText = isset($row['question_text']) ? trim(strip_tags($row['question_text'])) : '';
 
                 // Jika kolom pertanyaan ada isinya, buat pertanyaan baru
                 if (!empty($questionText)) {
                     $question = DiagnosticQuestion::create([
+                        // PERBAIKAN: Masukkan assessment_type dari excel, fallback ke 'initial_diagnostic'
+                        'assessment_type' => isset($row['assessment_type']) ? trim(strip_tags($row['assessment_type'])) : 'initial_diagnostic',
                         'question_text' => $questionText,
                         'category' => trim(strip_tags($row['category'] ?? 'general')),
                         'is_active' => true,

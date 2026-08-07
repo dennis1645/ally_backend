@@ -6,8 +6,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use App\Models\UserMilestone; // Memanggil model yang benar
-use App\Models\ScholarshipApplication; // Asumsi dari kode sebelumnya
+use App\Models\User;
+use App\Models\UserMilestone; 
+use App\Models\ScholarshipApplication; 
+use App\Models\ActionPlan; 
 use App\Mail\SmartNudgeMail;
 use Carbon\Carbon;
 
@@ -19,83 +21,113 @@ class SendSmartNudgeReminders extends Command
     public function handle()
     {
         $today = Carbon::now()->startOfDay();
-
-        // Pemetaan target tanggal
+        
         $targetDates = [
             'H-3'   => $today->copy()->addDays(3)->toDateString(),
             'H-1'   => $today->copy()->addDays(1)->toDateString(),
             'Hari H'=> $today->toDateString(),
             'H+1'   => $today->copy()->subDays(1)->toDateString(),
         ];
+        $datesList = array_values($targetDates);
 
+        $this->info("=========================================");
         $this->info("Memulai proses Smart Nudge Reminders...");
+        $this->info("Target Tanggal Pencarian: " . implode(', ', $datesList));
+        $this->info("=========================================");
 
         // ==========================================
-        // 1. Proses UserMilestone (Task Utama & Subtask)
+        // 1. Proses UserMilestone (Menggunakan whereDate yang lebih aman)
         // ==========================================
-        $milestones = UserMilestone::whereNull('completed_at') // Cari yang belum selesai
-            ->whereIn(DB::raw("DATE(target_deadline)"), array_values($targetDates))
-            ->with('user')
+        $milestones = UserMilestone::where(function($q) {
+                $q->whereNull('completed_at')->orWhere('status', 'pending');
+            })
+            ->where(function($q) use ($datesList) {
+                foreach ($datesList as $date) {
+                    $q->orWhereDate('target_deadline', $date);
+                }
+            })
             ->get();
-
+        
+        $this->info("🔍 [UserMilestone] Ditemukan: " . $milestones->count() . " data.");
         $this->processNotification($milestones, 'target_deadline', 'task_name', 'Milestone/Task', $targetDates);
-
 
         // ==========================================
         // 2. Proses Deadline Beasiswa
         // ==========================================
-        // Pastikan model ini ada dan sesuaikan nama kolom status/selesainya
         if (class_exists(ScholarshipApplication::class)) {
-            $scholarships = ScholarshipApplication::where('is_completed', false) 
-                ->whereIn(DB::raw("DATE(closing_date)"), array_values($targetDates))
-                ->with('user')
+            $scholarships = ScholarshipApplication::where('is_completed', false)
+                ->where(function($q) use ($datesList) {
+                    foreach ($datesList as $date) {
+                        $q->orWhereDate('closing_date', $date);
+                    }
+                })
                 ->get();
-
+                
+            $this->info("🔍 [Scholarship] Ditemukan: " . $scholarships->count() . " data.");
             $this->processNotification($scholarships, 'closing_date', 'title', 'Pendaftaran Beasiswa', $targetDates);
         }
 
-        $this->info("Proses selesai.");
+        // ==========================================
+        // 3. Proses Action Plans (Tugas Mentor)
+        // ==========================================
+        if (class_exists(ActionPlan::class)) {
+            $actionPlans = ActionPlan::where('is_completed', false)
+                ->where(function($q) use ($datesList) {
+                    foreach ($datesList as $date) {
+                        $q->orWhereDate('deadline', $date);
+                    }
+                })
+                ->get();
+                
+            $this->info("🔍 [ActionPlan] Ditemukan: " . $actionPlans->count() . " data.");
+            $this->processNotification($actionPlans, 'deadline', 'task_description', 'Tugas Mentor', $targetDates);
+        }
+
+        $this->info("=========================================");
+        $this->info("✅ Proses selesai.");
     }
 
     /**
      * Reusable logic untuk mengirim notifikasi dan freeze streak
-     * Format dipindah agar lebih fleksibel menerima Collection hasil query
      */
     private function processNotification($items, $dateColumn, $titleColumn, $itemType, $targetDates)
     {
+        if ($items->isEmpty()) {
+            return;
+        }
+
         foreach ($items as $item) {
-            $user = $item->user;
+            $userId = $item->mentee_id ?? $item->user_id; 
+            $user = $item->user ?? $item->mentee ?? User::find($userId);
             
-            // Skip kalau data user tidak ada atau email kosong
             if (!$user || empty($user->email)) {
+                $this->warn("⚠️ Skipped {$itemType} ID {$item->id}: User tidak ditemukan atau email kosong.");
                 continue;
             }
 
             $itemDate = Carbon::parse($item->$dateColumn)->toDateString();
-            $context = array_search($itemDate, $targetDates); // Dapatkan key: 'H-3', 'H-1', dll.
+            $context = array_search($itemDate, $targetDates); 
 
             // Logic Freeze Streak (Jika sudah Overdue / H+1)
-            // Asumsi di tabel User sudah ditambahkan kolom 'is_streak_frozen'
             if ($context === 'H+1' && !$user->is_streak_frozen) {
                 $user->is_streak_frozen = true;
                 $user->save();
                 
                 Log::info("Streak dibekukan untuk User ID: {$user->id} karena {$itemType} overdue.");
+                $this->info("❄️ STREAK DIBEKUKAN untuk {$user->email} (Overdue)");
             }
 
-            // Error Handling: Try-Catch agar cron tidak mati jika SMTP bermasalah
             try {
-                // Ambil nama task (dinamis berdasarkan nama kolom)
                 $itemName = $item->$titleColumn ?? 'Tugas Terjadwal';
 
                 Mail::to($user->email)->send(
                     new SmartNudgeMail($user, $context, $itemName, $itemType)
                 );
                 
-                $this->info("Email {$context} terkirim ke {$user->email} untuk {$itemType}");
+                $this->info("📧 ✅ Email [{$context}] terkirim ke {$user->email} untuk tugas: {$itemName}");
             } catch (\Exception $e) {
-                // Catat error tapi biarkan loop tetap berjalan untuk user/item lain
                 Log::error("Gagal mengirim email nudge ke {$user->email}. Error: " . $e->getMessage());
+                $this->error("❌ Gagal kirim email ke {$user->email}: " . $e->getMessage());
             }
         }
     }
