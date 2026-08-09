@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\DiagnosticAssessment;
 use App\Models\UserMilestone;
-use App\Services\GamificationService; // Tambahkan import ini
+use App\Services\GamificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB; // Tambahkan import DB
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -58,9 +58,66 @@ class AuthController extends Controller
             ],
             'phone_number' => [
                 'required',
-                'numeric',
-                'regex:/^[0-9]+$/',
-                'unique:users,phone_number'
+                'string',
+                'min:12',
+                'max:16',
+                'unique:users,phone_number',
+                function ($attribute, $value, $fail) {
+                    // Daftar ekstensif kode negara di dunia
+                    $validCountryCodes = [
+                        '+1', '+7', '+20', '+27', '+31', '+32', '+33', '+34', '+36', '+39', '+40', 
+                        '+41', '+43', '+44', '+45', '+46', '+47', '+48', '+49', '+51', '+52', '+54', 
+                        '+55', '+56', '+57', '+58', '+60', '+61', '+62', '+63', '+64', '+65', '+66', 
+                        '+81', '+82', '+84', '+86', '+90', '+91', '+92', '+93', '+94', '+95', '+98',
+                        '+212', '+213', '+216', '+218', '+220', '+221', '+222', '+223', '+224', '+225',
+                        '+226', '+227', '+228', '+229', '+230', '+231', '+232', '+233', '+234', '+236',
+                        '+237', '+238', '+239', '+240', '+241', '+242', '+243', '+244', '+245', '+246',
+                        '+248', '+249', '+250', '+251', '+252', '+253', '+254', '+255', '+256', '+257',
+                        '+258', '+260', '+261', '+262', '+263', '+264', '+265', '+266', '+267', '+268',
+                        '+269', '+290', '+291', '+297', '+298', '+299', '+350', '+351', '+352', '+353',
+                        '+354', '+355', '+356', '+357', '+358', '+359', '+370', '+371', '+372', '+373',
+                        '+374', '+375', '+376', '+377', '+378', '+379', '+380', '+381', '+382', '+385',
+                        '+386', '+387', '+389', '+420', '+421', '+423', '+500', '+501', '+502', '+503',
+                        '+504', '+505', '+506', '+507', '+508', '+509', '+590', '+591', '+592', '+593',
+                        '+594', '+595', '+596', '+597', '+598', '+599', '+850', '+852', '+853', '+855',
+                        '+856', '+880', '+886', '+960', '+961', '+962', '+963', '+964', '+965', '+966',
+                        '+967', '+968', '+970', '+971', '+972', '+973', '+974', '+975', '+976', '+977',
+                        '+992', '+993', '+994', '+995', '+996', '+998'
+                    ];
+
+                    $startsWithValidCode = false;
+                    $coreNumber = '';
+
+                    // Cek apakah diawali 0 atau kode negara
+                    if (str_starts_with($value, '0')) {
+                        $startsWithValidCode = true;
+                        $coreNumber = substr($value, 1);
+                    } else {
+                        foreach ($validCountryCodes as $code) {
+                            if (str_starts_with($value, $code)) {
+                                $startsWithValidCode = true;
+                                $coreNumber = substr($value, strlen($code));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!$startsWithValidCode) {
+                        $fail('Nomor telepon harus diawali dengan angka 0 atau kode negara yang valid (contoh: +62).');
+                        return;
+                    }
+
+                    // Cek apakah sisanya benar-benar angka semua
+                    if (!preg_match('/^[0-9]+$/', $coreNumber)) {
+                        $fail('Format nomor telepon tidak valid. Hanya gunakan angka setelah prefix.');
+                        return;
+                    }
+
+                    // Cek angka berulang identik (contoh: 000000000 atau 999999999)
+                    if (preg_match('/^(.)\1+$/', $coreNumber)) {
+                        $fail('Nomor telepon tidak valid karena angka berulang secara tidak wajar (contoh: 000000000).');
+                    }
+                }
             ],
             'password' => [
                 'required',
@@ -84,7 +141,7 @@ class AuthController extends Controller
             'guest_token' => 'nullable|string'
         ]);
 
-        DB::beginTransaction(); // Mulai transaksi database
+        DB::beginTransaction(); 
         try {
             // 1. Buat User Baru
             $user = User::create([
@@ -103,13 +160,11 @@ class AuthController extends Controller
                 $assessment = DiagnosticAssessment::where('guest_token', $request->guest_token)->first();
                 
                 if ($assessment) {
-                    // Assign asesmen ke user ini dan hapus token anonimnya
                     $assessment->update([
                         'user_id' => $user->id,
                         'guest_token' => null
                     ]);
 
-                    // Update profil readiness_score user sesuai hasil asesmen
                     $user->update([
                         'readiness_score' => $assessment->overall_score
                     ]);
@@ -119,8 +174,6 @@ class AuthController extends Controller
             }
 
             // 3. GENERATE AUTO-MILESTONE (TASK AWAL) UNTUK USER BARU
-            
-            // Milestone 1: Self Reflection
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 1: Self Reflection',
@@ -135,7 +188,6 @@ class AuthController extends Controller
                 'xp_reward' => 50
             ]);
 
-            // Milestone 2: Target Scholarship
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 2: Target Scholarship',
@@ -149,7 +201,6 @@ class AuthController extends Controller
                 'xp_reward' => 100
             ]);
 
-            // Milestone 3: Reveal Your Mentor
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 3: Reveal Your Mentor',
@@ -166,29 +217,40 @@ class AuthController extends Controller
             // 4. BERIKAN REWARD XP JIKA BAWA GUEST TOKEN
             $gamificationData = null;
             if ($isFirstMilestoneCompleted) {
-                // Beri reward 50 XP sesuai dengan xp_reward dari Fase 1
                 $gamificationData = GamificationService::addXpAndCheckBadges($user, 50);
             }
 
-            DB::commit(); // Simpan semua perubahan secara permanen
+            DB::commit();
 
-            // Trigger Event & Buat Token (Dilakukan di luar DB transaction agar lebih aman)
             event(new Registered($user));
             $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Setup HTTP-Only Cookie
+            $cookie = cookie(
+                'auth_token', 
+                $token, 
+                60 * 24 * 7, // Kadaluarsa dalam 7 hari (dalam menit)
+                '/', 
+                null, 
+                env('APP_ENV') !== 'local', // Secure flag aktif jika bukan di environment local
+                true, // Fitur Keamanan XSS: HTTP-Only!
+                false, 
+                'Strict' // Proteksi CSRF
+            );
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Registration successful. Welcome to your scholarship journey!',
                 'data' => [
                     'user' => $user,
-                    'access_token' => $token,
+                    'access_token' => $token, // Tetap di-pass dalam JSON sesuai permintaan
                     'token_type' => 'Bearer',
-                    'gamification' => $gamificationData // Kirim data naik level/badge ke frontend jika ada
+                    'gamification' => $gamificationData 
                 ]
-            ], 201);
+            ], 201)->withCookie($cookie);
 
         } catch (\Exception $e) {
-            DB::rollBack(); // Batalkan semua jika ada gagal di tengah jalan
+            DB::rollBack();
             return response()->json([
                 'status' => 'error', 
                 'message' => 'Registration failed: ' . $e->getMessage()
@@ -218,8 +280,11 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
+        
+        // Setup HTTP-Only Cookie setelah berhasil verifikasi dan login otomatis
+        $cookie = cookie('auth_token', $token, 60 * 24 * 7, '/', null, env('APP_ENV') !== 'local', true, false, 'Strict');
 
-        return redirect()->away($redirectUrl . '?token=' . $token . '&verified=true');
+        return redirect()->away($redirectUrl . '?token=' . $token . '&verified=true')->withCookie($cookie);
     }
 
     // Login function
@@ -267,15 +332,30 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // =====================================
+        // IMPLEMENTASI HTTP-ONLY COOKIE LOGIN
+        // =====================================
+        $cookie = cookie(
+            'auth_token', 
+            $token, 
+            60 * 24 * 7, // 7 hari
+            '/', 
+            null, 
+            env('APP_ENV') !== 'local', // Secure flag (Hanya https jika bukan local)
+            true, // HTTP-Only di-set TRUE
+            false, 
+            'Strict' // SameSite di-set Strict
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Login successful.',
             'data' => [
                 'user' => $user,
-                'access_token' => $token,
+                'access_token' => $token, // Sesuai permintaan, tetap terlampir di response
                 'token_type' => 'Bearer'
             ]
-        ], 200);
+        ], 200)->withCookie($cookie);
     }
 
     // Forgot password function
@@ -417,12 +497,16 @@ class AuthController extends Controller
     // Logout function
     public function logout(Request $request)
     {
+        // Hapus token akses yang saat ini berjalan
         $request->user()->currentAccessToken()->delete();
+
+        // Lakukan pembersihan HTTP-Only Cookie saat logout
+        $cookie = cookie()->forget('auth_token');
 
         return response()->json([
             'status' => 'success',
             'message' => 'Logout successful.',
             'data' => []
-        ], 200);
+        ], 200)->withCookie($cookie);
     }
 }
