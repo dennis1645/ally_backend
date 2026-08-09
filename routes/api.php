@@ -24,6 +24,7 @@ use App\Http\Controllers\MentorDocumentController;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\UserDeepDiagnosticController;
+use App\Http\Controllers\SupportTicketController; // Import Controller Support Ticket
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -79,6 +80,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Scholarship Module
     Route::get('/scholarships', [ScholarshipController::class, 'index']);
     Route::get('/scholarships/{id}', [ScholarshipController::class, 'show']);
+
+    // ==========================================
+    // CUSTOMER SUPPORT / TICKETING (USER SIDE)
+    // ==========================================
+    Route::prefix('support')->group(function () {
+        Route::get('/my-tickets', [SupportTicketController::class, 'myTickets']);
+        Route::get('/my-tickets/{id}', [SupportTicketController::class, 'showMyTicket']); // Lihat detail tiket user
+        Route::post('/submit', [SupportTicketController::class, 'submitTicket']);
+    });
 
     // USER MODULE (Productivity, Journaling & Vault)
     Route::prefix('journals')->group(function () {
@@ -188,7 +198,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ADMIN MODULE (Admin Only)
     Route::middleware('role:admin')->prefix('admin')->group(function () {
 
-    Route::get('/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
+        Route::get('/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
         
         // User Management
         Route::get('/get-users', [AdminController::class, 'index']); 
@@ -216,11 +226,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/diagnostic-questions', [AdminDiagnosticController::class, 'index']);
         Route::post('/diagnostic-questions/import', [AdminDiagnosticController::class, 'importExcel']);
         Route::post('/diagnostic-questions', [AdminDiagnosticController::class, 'store']);
-        
-        // Hapus semua data (Di atas rute {id} agar tidak terbaca sebagai parameter ID)
         Route::delete('/diagnostic-questions/clear-all', [AdminDiagnosticController::class, 'destroyAll']); 
-        
-        // Rute dengan parameter {id}
         Route::put('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'update']);
         Route::delete('/diagnostic-questions/{id}', [AdminDiagnosticController::class, 'destroy']);
 
@@ -238,7 +244,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/practice-exams/{id}', [AdminPracticeExamController::class, 'updateExam']);
         Route::delete('/practice-exams/clear-all', [AdminPracticeExamController::class, 'destroyAll']);
         Route::delete('/practice-exams/{id}', [AdminPracticeExamController::class, 'destroyExam']);
-        
         Route::put('/practice-questions/{id}', [AdminPracticeExamController::class, 'updateQuestion']);
         Route::delete('/practice-questions/{id}', [AdminPracticeExamController::class, 'destroyQuestion']);
 
@@ -249,5 +254,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/badges/{id}', [AdminBadgeController::class, 'update']);
         Route::delete('/badges/{id}', [AdminBadgeController::class, 'destroy']);
         
+        // ==========================================
+        // CUSTOMER SUPPORT / TICKETING (ADMIN SIDE)
+        // ==========================================
+        Route::prefix('support')->group(function () {
+            Route::get('/stats', [SupportTicketController::class, 'adminStats']); // Laporan Statistik
+            Route::get('/tickets', [SupportTicketController::class, 'adminIndex']); // GET ALL
+            Route::get('/tickets/{id}', [SupportTicketController::class, 'adminShow']); // Lihat detail 1 tiket
+            Route::post('/tickets/{id}/reply', [SupportTicketController::class, 'adminReply']);
+            Route::patch('/tickets/{id}/resolve', [SupportTicketController::class, 'adminResolve']);
+        });
+
     });
 });
