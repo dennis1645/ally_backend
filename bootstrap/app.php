@@ -14,13 +14,22 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Mendaftarkan alias middleware kamu
+        
+        // 1. TAMBAHKAN INI: Kecualikan auth_token dari Enkripsi Laravel
+        $middleware->encryptCookies(except: [
+            'auth_token',
+        ]);
+
+        // 2. Mendaftarkan alias middleware kamu
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
+        
+        // 3. Pasang jembatan Header kamu
         $middleware->api(prepend: [
             \App\Http\Middleware\AddAuthTokenHeader::class,
         ]);
+        
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Memaksa response JSON untuk semua rute API
