@@ -206,7 +206,7 @@ class AuthController extends Controller
                 'task_name' => 'Fase 3: Reveal Your Mentor',
                 'description' => 'Unlock and meet your dedicated AI/human mentor to guide your personalized scholarship journey.',
                 'step_order' => 3,
-                'is_premium' => false,
+                'is_premium' => true,
                 'status' => 'pending',
                 'target_deadline' => Carbon::now()->addDays(7),
                 'source' => 'system',

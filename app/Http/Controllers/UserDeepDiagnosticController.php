@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DiagnosticQuestion;
 use App\Models\DiagnosticOption;
 use App\Models\DiagnosticAssessment;
+use App\Models\UserMilestone; // <-- TAMBAHAN: Import Model UserMilestone
 use App\Models\User;
 use App\Services\GamificationService;
 use App\Services\AIDiagnosticService;
@@ -29,7 +30,7 @@ class UserDeepDiagnosticController extends Controller
      */
     public function getQuestions(Request $request)
     {
-        // PERBAIKAN: Sesuaikan dengan string yang ada di database phpMyAdmin
+        // Sesuaikan dengan string yang ada di database phpMyAdmin
         $assessmentType = 'assessment_2';
 
         $questions = DiagnosticQuestion::where('is_active', true)
@@ -126,7 +127,7 @@ class UserDeepDiagnosticController extends Controller
             'scholarship_target' => $user->primary_scholarship_target,
         ];
 
-        // PERBAIKAN: Ubah menjadi assessment_2
+        // Memanggil AI Service untuk Analisis
         $aiResponse = $this->aiDiagnosticService->generateAnalysis(
             $userAnswersForAI, 
             $userDataForAI, 
@@ -145,9 +146,10 @@ class UserDeepDiagnosticController extends Controller
         DB::beginTransaction();
         try {
             $assessmentData = [
-                'assessment_type' => 'assessment_2', // PERBAIKAN: Ubah menjadi assessment_2
+                'assessment_type' => 'assessment_2', 
                 'user_id' => $user->id,
                 'guest_token' => null,
+                'raw_answers' => json_encode($userAnswersForAI), 
                 'readiness_percentage' => $aiData['revised_percentage'] ?? $user->readiness_score ?? 0,
                 'reason' => $aiData['suggestion'] ?? null, 
                 'readiness_level' => null,
@@ -164,7 +166,7 @@ class UserDeepDiagnosticController extends Controller
             $assessment = DiagnosticAssessment::updateOrCreate(
                 [
                     'user_id' => $user->id, 
-                    'assessment_type' => 'assessment_2' // PERBAIKAN: Ubah menjadi assessment_2
+                    'assessment_type' => 'assessment_2' 
                 ],
                 $assessmentData
             );
@@ -173,14 +175,36 @@ class UserDeepDiagnosticController extends Controller
                 'readiness_score' => $aiData['revised_percentage'] ?? $user->readiness_score
             ]);
 
-            $xpReward = 100; 
+            // ====================================================
+            // TAMBAHAN BARU: Auto-Complete Milestone Fase 2
+            // ====================================================
+            // Cari milestone dasar milik user yang berada di urutan ke-2 (Fase 2)
+            $fase2Milestone = UserMilestone::where('user_id', $user->id)
+                ->whereNull('scholarship_id') // Milestone onboarding/fase awal biasanya tidak terikat beasiswa spesifik
+                ->where('step_order', 2)      // Mencari Fase 2
+                ->first();
+
+            // Jika Fase 2 ditemukan dan belum selesai, otomatis selesaikan!
+            if ($fase2Milestone && $fase2Milestone->status !== 'completed') {
+                $fase2Milestone->update([
+                    'status' => 'completed',
+                    'completed_at' => now()
+                ]);
+                
+                // Tambahkan XP Reward dari Fase 2 ke poin user
+                $user->xp_points += $fase2Milestone->xp_reward;
+                $user->save();
+            }
+            // ====================================================
+
+            $xpReward = 100; // Reward untuk mengerjakan Deep Assessment
             $gamificationData = GamificationService::addXpAndCheckBadges($user, $xpReward);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Deep assessment submitted and analyzed by AI successfully.',
+                'message' => 'Deep assessment submitted and analyzed by AI successfully. Milestone Fase 2 Auto-Completed!',
                 'data' => [
                     'assessment' => $assessment,
                     'user_profile' => $user->fresh()->makeHidden(['password']),
@@ -202,7 +226,7 @@ class UserDeepDiagnosticController extends Controller
         $user = Auth::guard('sanctum')->user();
         
         $assessment = DiagnosticAssessment::where('user_id', $user->id)
-            ->where('assessment_type', 'assessment_2') // PERBAIKAN: Ubah menjadi assessment_2
+            ->where('assessment_type', 'assessment_2') 
             ->first();
 
         if (!$assessment) {

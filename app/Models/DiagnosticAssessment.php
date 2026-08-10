@@ -23,6 +23,7 @@ class DiagnosticAssessment extends Model
         'scholarship_goal_score',
         'leadership_score',
         'achievements_score',
+        'raw_answers', // Menyimpan jawaban mentah user dalam bentuk JSON
         'english_score',
         'application_score',
         

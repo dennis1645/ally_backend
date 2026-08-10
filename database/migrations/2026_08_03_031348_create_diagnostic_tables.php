@@ -48,6 +48,8 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('guest_token')->nullable()->index(); 
             $table->string('assessment_type')->default('initial_diagnostic'); 
+
+            $table->json('raw_answers')->nullable()->comment('Menyimpan jawaban mentah user dalam format key-value');
             
             // ---------------------------------------------------
             // DATA HASIL GENERATE AI GEMINI
