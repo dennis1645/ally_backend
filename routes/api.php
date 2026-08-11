@@ -141,7 +141,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [MilestoneController::class, 'getTimeline']);
         Route::post('/generate', [MilestoneController::class, 'generateTimeline']);
         Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); 
-        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);    
+        Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);   
+        Route::patch('/{id}/discover', [MilestoneController::class, 'markAsDiscovered']); 
     });
 
     // Shop & Monetization (Premium & Tokens)

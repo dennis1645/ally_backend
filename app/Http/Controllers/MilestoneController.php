@@ -203,6 +203,7 @@ class MilestoneController extends Controller
                     'status'          => 'pending',
                     'source'          => 'system',
                     'is_mandatory'    => true,
+                    'is_discovered'   => false, // Set default false saat dibuat
                     'xp_reward'       => 0, 
                 ]);
 
@@ -226,6 +227,7 @@ class MilestoneController extends Controller
                         'status'          => 'pending',
                         'source'          => 'system',
                         'is_mandatory'    => true,
+                        'is_discovered'   => false, // Set default false saat dibuat
                         'xp_reward'       => $checkpoint['xp_reward'] ?? 50,
                     ]);
 
@@ -245,6 +247,7 @@ class MilestoneController extends Controller
                             'status'          => 'pending',
                             'source'          => 'system',
                             'is_mandatory'    => $task['is_mandatory'] ?? true,
+                            'is_discovered'   => false, // Set default false saat dibuat
                             'xp_reward'       => 20, 
                         ]);
                     }
@@ -431,5 +434,44 @@ class MilestoneController extends Controller
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => 'Terjadi kesalahan sistem.', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * TANDAI TASK SEBAGAI DISCOVERED
+     * (Berguna untuk trigger animasi reveal di frontend)
+     */
+    public function markAsDiscovered(Request $request, $id)
+    {
+        $user = Auth::user();
+        
+        $milestone = UserMilestone::where('id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$milestone) {
+            return response()->json([
+                'status' => 'error', 
+                'message' => 'Milestone tidak ditemukan.'
+            ], 404);
+        }
+
+        // Kalau sudah true, yaudah sukses saja biar rapi (Idempotent)
+        if ($milestone->is_discovered) {
+            return response()->json([
+                'status' => 'success', 
+                'message' => 'Milestone sudah ditandai discovered sebelumnya.', 
+                'data' => $milestone
+            ], 200);
+        }
+
+        // Update ke true
+        $milestone->is_discovered = true;
+        $milestone->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Milestone berhasil ditandai sebagai discovered.',
+            'data' => $milestone
+        ], 200);
     }
 }

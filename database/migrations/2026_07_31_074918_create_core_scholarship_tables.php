@@ -105,6 +105,7 @@ return new class extends Migration
             
             $table->enum('source', ['system', 'mentor', 'user'])->default('system');
             $table->boolean('is_mandatory')->default(true);
+            $table->boolean('is_discovered')->default(false);
             
             $table->integer('xp_reward')->default(0); 
             

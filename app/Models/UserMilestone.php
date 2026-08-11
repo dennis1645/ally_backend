@@ -23,12 +23,14 @@ class UserMilestone extends Model
         'completed_at',
         'source',
         'is_mandatory',
+        'is_discovered',  // Ditambahkan
         'xp_reward',
     ];
 
     protected $casts = [
         'is_premium' => 'boolean', // Casting boolean
         'is_mandatory' => 'boolean',
+        'is_discovered' => 'boolean', // Casting boolean
         'target_deadline' => 'date',
         'completed_at' => 'datetime',
     ];
