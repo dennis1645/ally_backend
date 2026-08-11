@@ -57,8 +57,8 @@ class PaymentController extends Controller
             ]);
 
             // ========================================================
-            // PERBAIKAN: Arahkan callback ke route proxy Laravel kita
-            // menggunakan url() agar otomatis mengikuti domain Ngrok
+            // Arahkan callback ke route proxy Laravel kita
+            // menggunakan url() agar otomatis mengikuti domain Ngrok/cPanel
             // ========================================================
             $proxyUrl = url('/api/payment/return');
 
@@ -179,8 +179,11 @@ class PaymentController extends Controller
         $orderId = $request->query('order_id');
         $transactionStatus = $request->query('transaction_status', 'pending');
 
-        // Tarik URL frontend dari .env (http://localhost:5173/checkout)
-        $redirectUrl = env('REDIRECT_URL', 'http://localhost:5173/checkout');
+        // ================================================================
+        // PERBAIKAN FINAL: HARDCODE URL FRONTEND (BYPASS CPANEL CACHE)
+        // Kita matikan env() dan paksa string manual ke localhost.
+        // ================================================================
+        $redirectUrl = 'http://localhost:5173/checkout';
 
         // Mapping status agar lebih rapi untuk dibaca frontend
         $status = 'pending';
