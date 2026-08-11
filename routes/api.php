@@ -16,7 +16,7 @@ use App\Http\Controllers\MentorPortalController;
 use App\Http\Controllers\MentorBookingController;
 use App\Http\Controllers\ShopController; 
 use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\PaymentController; // <-- IMPORT BARU DITAMBAHKAN DI SINI
+use App\Http\Controllers\PaymentController; 
 use App\Http\Controllers\AdminShopItemController; 
 use App\Http\Controllers\AdminPracticeExamController;
 use App\Http\Controllers\DailyDrillController;
@@ -41,6 +41,11 @@ Route::middleware('throttle:60,1')->group(function () {
 
     // Midtrans Webhook Callback (Publik, diakses langsung oleh server Midtrans)
     Route::post('/midtrans/webhook', [ShopController::class, 'webhook']);
+
+    // ==========================================
+    // RUTE PROXY REDIRECT MIDTRANS -> FRONTEND
+    // ==========================================
+    Route::get('/payment/return', [PaymentController::class, 'paymentReturn']); // <-- RUTE BARU DITAMBAHKAN DI SINI
 
     // Diagnostic Assessment (Public Hook - Bisa diakses Guest maupun Logged In)
     Route::prefix('diagnostic')->group(function () {
@@ -155,7 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // UPGRADE PREMIUM (MIDTRANS)
     // ==========================================
-    Route::post('/upgrade-premium', [PaymentController::class, 'upgradeToPremium']); // <-- ROUTE BARU
+    Route::post('/upgrade-premium', [PaymentController::class, 'upgradeToPremium']); 
 
     // Transaction History & Status
     Route::prefix('transactions')->group(function () {

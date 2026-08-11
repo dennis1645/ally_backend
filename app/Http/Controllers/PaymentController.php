@@ -57,9 +57,10 @@ class PaymentController extends Controller
             ]);
 
             // ========================================================
-            // PERBAIKAN: Tarik langsung REDIRECT_URL dari file .env
+            // PERBAIKAN: Arahkan callback ke route proxy Laravel kita
+            // menggunakan url() agar otomatis mengikuti domain Ngrok
             // ========================================================
-            $redirectUrl = env('REDIRECT_URL', 'http://localhost:5173/checkout');
+            $proxyUrl = url('/api/payment/return');
 
             // 3. Request Snap Token / Payment URL ke Midtrans API
             $params = [
@@ -80,11 +81,11 @@ class PaymentController extends Controller
                         'name' => 'Upgrade Akun Premium & Unlock Semua Fitur Eksklusif',
                     ]
                 ],
-                // Set Callback Redirect dengan menempelkan parameter status
+                // Set Callback Redirect ke Proxy Laravel
                 'callbacks' => [
-                    'finish' => $redirectUrl . '?status=success&order_id=' . $orderId,
-                    'unfinish' => $redirectUrl . '?status=pending&order_id=' . $orderId,
-                    'error' => $redirectUrl . '?status=error&order_id=' . $orderId,
+                    'finish' => $proxyUrl,
+                    'unfinish' => $proxyUrl,
+                    'error' => $proxyUrl,
                 ]
             ];
 
@@ -167,5 +168,29 @@ class PaymentController extends Controller
             Log::error('Webhook Exception: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * PROXY REDIRECT: Menangkap redirect dari Midtrans lalu melempar paksa ke Frontend (localhost)
+     */
+    public function paymentReturn(Request $request)
+    {
+        // Midtrans otomatis mengirimkan parameter ini via URL
+        $orderId = $request->query('order_id');
+        $transactionStatus = $request->query('transaction_status', 'pending');
+
+        // Tarik URL frontend dari .env (http://localhost:5173/checkout)
+        $redirectUrl = env('REDIRECT_URL', 'http://localhost:5173/checkout');
+
+        // Mapping status agar lebih rapi untuk dibaca frontend
+        $status = 'pending';
+        if (in_array($transactionStatus, ['capture', 'settlement'])) {
+            $status = 'success';
+        } elseif (in_array($transactionStatus, ['cancel', 'deny', 'expire'])) {
+            $status = 'error';
+        }
+
+        // Paksa browser melempar user ke Localhost Frontend!
+        return redirect()->away($redirectUrl . '?status=' . $status . '&order_id=' . $orderId);
     }
 }
