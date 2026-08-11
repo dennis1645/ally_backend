@@ -10,11 +10,65 @@ use Illuminate\Support\Facades\Mail;
 use App\Models\User;
 use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
-use App\Models\SessionReview; // <-- IMPORT BARU
-use App\Models\MentorProfile; // <-- IMPORT BARU
+use App\Models\SessionReview;
+use App\Models\MentorProfile;
 
 class MentorBookingController extends Controller
 {
+    /**
+     * [BARU] 0. MENTEE MELIHAT JADWAL KETERSEDIAAN MENTOR
+     */
+    public function getMentorAvailability(Request $request)
+    {
+        $mentee = Auth::user();
+
+        // 1. Tentukan ID mentor yang akan dicek.
+        // Jika ada input 'mentor_id' dari request, gunakan itu. 
+        // Jika tidak ada, gunakan 'assigned_mentor_id' milik mentee.
+        $targetMentorId = $request->query('mentor_id') ?? $mentee->assigned_mentor_id;
+
+        if (!$targetMentorId) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Silakan tentukan mentor_id yang ingin dicek, atau pastikan Anda sudah memiliki mentor yang ditugaskan (assigned mentor).'
+            ], 400);
+        }
+
+        // 2. Pastikan target user tersebut memang benar-benar seorang mentor
+        $mentor = User::where('id', $targetMentorId)
+            ->where('role', 'mentor')
+            ->first();
+
+        if (!$mentor) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Mentor tidak ditemukan atau pengguna tersebut bukan seorang mentor.'
+            ], 404);
+        }
+
+        // 3. Ambil jadwal mentor yang belum dibooking dan belum lewat batas hari ini
+        $availabilities = MentorAvailability::where('mentor_id', $mentor->id)
+            ->where('is_booked', false)
+            ->where('available_date', '>=', now()->toDateString())
+            ->orderBy('available_date', 'asc')
+            ->orderBy('start_time', 'asc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Berhasil mengambil jadwal ketersediaan mentor.',
+            'data' => [
+                'mentor' => [
+                    'id' => $mentor->id,
+                    'name' => $mentor->name,
+                    'profile_picture_url' => $mentor->profile_picture_url,
+                    'headline' => $mentor->headline,
+                ],
+                'availabilities' => $availabilities
+            ]
+        ], 200);
+    }
+
     /**
      * 1. MENTEE MELAKUKAN BOOKING JADWAL KONSULTASI 
      */

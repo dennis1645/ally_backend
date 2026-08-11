@@ -180,6 +180,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // MENTOR BOOKING (SISI MENTEE)
     // ==========================================
+    Route::get('/mentor/availability', [MentorBookingController::class, 'getMentorAvailability']);
     Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
     Route::get('/my-bookings', [MentorBookingController::class, 'getMyBookings']);
     
