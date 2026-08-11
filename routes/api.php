@@ -16,6 +16,7 @@ use App\Http\Controllers\MentorPortalController;
 use App\Http\Controllers\MentorBookingController;
 use App\Http\Controllers\ShopController; 
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\PaymentController; // <-- IMPORT BARU DITAMBAHKAN DI SINI
 use App\Http\Controllers\AdminShopItemController; 
 use App\Http\Controllers\AdminPracticeExamController;
 use App\Http\Controllers\DailyDrillController;
@@ -150,6 +151,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/items', [ShopController::class, 'index']);      // Melihat daftar paket (Premium / Token)
         Route::post('/checkout', [ShopController::class, 'checkout']); // Membeli paket dan mendapatkan Snap Token
     });
+
+    // ==========================================
+    // UPGRADE PREMIUM (MIDTRANS)
+    // ==========================================
+    Route::post('/upgrade-premium', [PaymentController::class, 'upgradeToPremium']); // <-- ROUTE BARU
 
     // Transaction History & Status
     Route::prefix('transactions')->group(function () {
