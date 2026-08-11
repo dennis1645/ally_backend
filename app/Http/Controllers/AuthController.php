@@ -174,6 +174,7 @@ class AuthController extends Controller
             }
 
             // 3. GENERATE AUTO-MILESTONE (TASK AWAL) UNTUK USER BARU
+            // Fase 1: is_discovered diset true agar langsung terbuka
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 1: Self Reflection',
@@ -185,9 +186,11 @@ class AuthController extends Controller
                 'target_deadline' => Carbon::now()->addDays(2),
                 'source' => 'system',
                 'is_mandatory' => true,
+                'is_discovered' => true, // <-- SET TO TRUE
                 'xp_reward' => 50
             ]);
 
+            // Fase 2: is_discovered diset false agar user harus tap/reveal
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 2: Target Scholarship',
@@ -198,9 +201,11 @@ class AuthController extends Controller
                 'target_deadline' => Carbon::now()->addDays(5),
                 'source' => 'system',
                 'is_mandatory' => true,
+                'is_discovered' => false, // <-- SET TO FALSE
                 'xp_reward' => 100
             ]);
 
+            // Fase 3: is_discovered diset false agar user harus tap/reveal
             UserMilestone::create([
                 'user_id' => $user->id,
                 'task_name' => 'Fase 3: Reveal Your Mentor',
@@ -211,6 +216,7 @@ class AuthController extends Controller
                 'target_deadline' => Carbon::now()->addDays(7),
                 'source' => 'system',
                 'is_mandatory' => true,
+                'is_discovered' => false, // <-- SET TO FALSE
                 'xp_reward' => 150
             ]);
 
