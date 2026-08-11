@@ -46,32 +46,48 @@ class MilestoneController extends Controller
 
     public function getTimeline(Request $request)
     {
+        // 1. UBAH VALIDASI MENJADI NULLABLE
         $request->validate([
-            'scholarship_id' => 'required|exists:scholarships,id',
+            'scholarship_id' => 'nullable|exists:scholarships,id',
         ]);
 
         $user = Auth::user();
-        $scholarshipId = $request->scholarship_id;
+        $scholarshipId = $request->scholarship_id; // Bisa null, bisa berisi angka (contoh: 1)
 
-        $milestones = UserMilestone::where('user_id', $user->id)
-            ->where(function ($query) use ($scholarshipId) {
-                $query->where('scholarship_id', $scholarshipId)
-                      ->orWhereNull('scholarship_id');
-            })
+        // 2. BANGUN QUERY DASAR (Root Milestone)
+        $query = UserMilestone::where('user_id', $user->id)
             ->whereNull('parent_id')
-            ->with(['subTasks' => function ($query) {
-                $query->orderBy('target_deadline', 'asc')
-                      ->with('subTasks'); 
+            ->with(['subTasks' => function ($q) {
+                $q->orderBy('target_deadline', 'asc')
+                  ->with('subTasks'); 
             }])
             ->orderBy('step_order', 'asc')
-            ->orderBy('target_deadline', 'asc')
-            ->get();
+            ->orderBy('target_deadline', 'asc');
 
+        // 3. LOGIKA PEMISAHAN BERDASARKAN PARAMETER
+        if ($scholarshipId) {
+            // Skenario A: User sudah milih beasiswa -> Ambil Fase 1-3 (null) + AI Timeline (scholarship_id)
+            $query->where(function ($q) use ($scholarshipId) {
+                $q->where('scholarship_id', $scholarshipId)
+                  ->orWhereNull('scholarship_id');
+            });
+        } else {
+            // Skenario B: User baru daftar & belum pilih beasiswa -> HANYA ambil Fase 1-3 (null)
+            $query->whereNull('scholarship_id');
+        }
+
+        $milestones = $query->get();
+
+        // 4. RESPONSE HANDLING
         if ($milestones->isEmpty()) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Belum ada timeline yang digenerate untuk beasiswa ini.'
-            ], 404);
+                'status' => 'success', // Diubah jadi success agar frontend tidak bingung me-render state kosong
+                'message' => 'Belum ada timeline yang ditemukan.',
+                'data' => [
+                    'is_user_premium' => (bool) $user->is_premium,
+                    'milestones' => []
+                ]
+            ], 200);
         }
 
         return response()->json([
@@ -95,7 +111,6 @@ class MilestoneController extends Controller
         // =====================================================================
         // LOGIKA BARU: BLOKIR GENERATE JIKA MASIH ADA TIMELINE AKTIF
         // =====================================================================
-        // Cek apakah user sudah punya milestone beasiswa (Cukup cek level parent tertinggi)
         $existingMilestone = UserMilestone::where('user_id', $user->id)
             ->whereNotNull('scholarship_id')
             ->whereNull('parent_id')
@@ -103,18 +118,16 @@ class MilestoneController extends Controller
             ->first();
 
         if ($existingMilestone) {
-            // Ambil data beasiswa yang sedang aktif dikerjakan oleh user
             $activeScholarship = Scholarship::find($existingMilestone->scholarship_id);
             
             if ($activeScholarship) {
                 $activeDeadline = Carbon::parse($activeScholarship->deadline_date);
                 
-                // Jika hari ini MASIH SEBELUM deadline beasiswa yang lama
                 if (Carbon::now()->lessThan($activeDeadline)) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Anda hanya bisa melakukan generate 1 kali. Anda sudah memiliki timeline aktif untuk beasiswa "' . $activeScholarship->name . '". Silakan tunggu sampai masa pendaftaran beasiswa tersebut habis pada ' . $activeDeadline->format('d M Y') . ' sebelum menargetkan beasiswa lain.',
-                    ], 403); // 403 Forbidden
+                    ], 403); 
                 }
             }
         }
@@ -176,8 +189,6 @@ class MilestoneController extends Controller
 
         DB::beginTransaction();
         try {
-            // Karena sudah diblokir di atas, baris ini otomatis hanya akan 
-            // menghapus timeline lama yang sudah expired/kadaluarsa
             UserMilestone::where('user_id', $user->id)
                 ->whereNotNull('scholarship_id')
                 ->delete();
@@ -203,7 +214,7 @@ class MilestoneController extends Controller
                     'status'          => 'pending',
                     'source'          => 'system',
                     'is_mandatory'    => true,
-                    'is_discovered'   => false, // Set default false saat dibuat
+                    'is_discovered'   => false, 
                     'xp_reward'       => 0, 
                 ]);
 
@@ -227,7 +238,7 @@ class MilestoneController extends Controller
                         'status'          => 'pending',
                         'source'          => 'system',
                         'is_mandatory'    => true,
-                        'is_discovered'   => false, // Set default false saat dibuat
+                        'is_discovered'   => false, 
                         'xp_reward'       => $checkpoint['xp_reward'] ?? 50,
                     ]);
 
@@ -247,7 +258,7 @@ class MilestoneController extends Controller
                             'status'          => 'pending',
                             'source'          => 'system',
                             'is_mandatory'    => $task['is_mandatory'] ?? true,
-                            'is_discovered'   => false, // Set default false saat dibuat
+                            'is_discovered'   => false, 
                             'xp_reward'       => 20, 
                         ]);
                     }
@@ -455,7 +466,6 @@ class MilestoneController extends Controller
             ], 404);
         }
 
-        // Kalau sudah true, yaudah sukses saja biar rapi (Idempotent)
         if ($milestone->is_discovered) {
             return response()->json([
                 'status' => 'success', 
@@ -464,7 +474,6 @@ class MilestoneController extends Controller
             ], 200);
         }
 
-        // Update ke true
         $milestone->is_discovered = true;
         $milestone->save();
 

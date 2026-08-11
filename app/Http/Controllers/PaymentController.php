@@ -56,6 +56,11 @@ class PaymentController extends Controller
                 'price' => $grossAmount,
             ]);
 
+            // ========================================================
+            // PERBAIKAN: Tarik langsung REDIRECT_URL dari file .env
+            // ========================================================
+            $redirectUrl = env('REDIRECT_URL', 'http://localhost:5173/checkout');
+
             // 3. Request Snap Token / Payment URL ke Midtrans API
             $params = [
                 'transaction_details' => [
@@ -74,6 +79,12 @@ class PaymentController extends Controller
                         'quantity' => 1,
                         'name' => 'Upgrade Akun Premium & Unlock Semua Fitur Eksklusif',
                     ]
+                ],
+                // Set Callback Redirect dengan menempelkan parameter status
+                'callbacks' => [
+                    'finish' => $redirectUrl . '?status=success&order_id=' . $orderId,
+                    'unfinish' => $redirectUrl . '?status=pending&order_id=' . $orderId,
+                    'error' => $redirectUrl . '?status=error&order_id=' . $orderId,
                 ]
             ];
 
