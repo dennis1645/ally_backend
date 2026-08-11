@@ -45,4 +45,8 @@ class ConsultationBooking extends Model
     {
         return $this->hasMany(ActionPlan::class, 'booking_id');
     }
+    public function reviews()
+    {
+        return $this->hasMany(SessionReview::class, 'booking_id');
+    }
 }

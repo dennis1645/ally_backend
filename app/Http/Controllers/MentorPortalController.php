@@ -13,6 +13,7 @@ use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
 use App\Models\ActionPlan;
 use App\Models\UserMilestone;
+use App\Models\SessionReview; // <-- IMPORT MODEL REVIEW
 
 class MentorPortalController extends Controller
 {
@@ -138,7 +139,7 @@ class MentorPortalController extends Controller
                 'milestones_progress' => $mentee->milestones->map(function ($m) {
                     return [
                         'milestone_id' => $m->id,
-                        'parent_id' => $m->parent_id, // Untuk melihat apakah ini cabang atau utama
+                        'parent_id' => $m->parent_id, 
                         'task_name' => $m->task_name,
                         'description' => $m->description,
                         'status' => $m->status,
@@ -378,11 +379,10 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
-        // VALIDASI BARU: Menambahkan parent_milestone_id agar bisa membuat branch
         $request->validate([
             'task_description' => 'required|string|max:255',
             'deadline' => 'required|date|after_or_equal:today',
-            'parent_milestone_id' => 'nullable|exists:user_milestones,id' // <-- UPDATE INI
+            'parent_milestone_id' => 'nullable|exists:user_milestones,id' 
         ]);
 
         $booking = ConsultationBooking::where('id', $bookingId)
@@ -402,7 +402,6 @@ class MentorPortalController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Simpan ke Action Plan Model
             $actionPlan = ActionPlan::create([
                 'booking_id' => $booking->id,
                 'mentee_id' => $booking->mentee_id,
@@ -411,24 +410,21 @@ class MentorPortalController extends Controller
                 'is_completed' => false,
             ]);
 
-            // 2. LOGIKA BRANCHING: Cari tahu parent milestone-nya jika dikirimkan oleh mentor
             $inheritedScholarshipId = null;
             if ($request->filled('parent_milestone_id')) {
                 $parentMilestone = UserMilestone::where('id', $request->parent_milestone_id)
                     ->where('user_id', $booking->mentee_id)
                     ->first();
                 
-                // Jika branch ini punya parent, warisi ID beasiswanya agar terkelompok rapi
                 if ($parentMilestone) {
                     $inheritedScholarshipId = $parentMilestone->scholarship_id;
                 }
             }
 
-            // 3. Simpan ke Milestone Mentee sebagai Branch (Jika parent_id ada) atau Main Task
             UserMilestone::create([
                 'user_id' => $booking->mentee_id,
-                'parent_id' => $request->parent_milestone_id ?? null, // <-- MASUKKAN KE BRANCH
-                'scholarship_id' => $inheritedScholarshipId,          // <-- MEWARISI BEASISWA
+                'parent_id' => $request->parent_milestone_id ?? null, 
+                'scholarship_id' => $inheritedScholarshipId,          
                 'task_name' => '[Action Plan Mentor]: ' . $request->task_description,
                 'description' => 'Tugas tambahan dari hasil sesi mentoring 1-on-1.',
                 'target_deadline' => $request->deadline,
@@ -438,7 +434,6 @@ class MentorPortalController extends Controller
                 'xp_reward' => 50,
             ]);
 
-            // 4. Tandai sesi sebagai Selesai (Completed)
             if ($booking->session_status !== 'completed') {
                 $booking->update(['session_status' => 'completed']);
             }
@@ -455,6 +450,63 @@ class MentorPortalController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * 6. MENTOR MEMBERIKAN EVALUASI / CATATAN UNTUK MENTEE (REVIEW SISI MENTOR)
+     */
+    public function submitMenteeReview(Request $request, $bookingId)
+    {
+        $mentor = Auth::user();
+
+        if ($mentor->role !== 'mentor') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'feedback' => 'nullable|string|max:1000',
+        ]);
+
+        $booking = ConsultationBooking::where('id', $bookingId)
+            ->where('mentor_id', $mentor->id)
+            ->first();
+
+        if (!$booking) {
+            return response()->json(['status' => 'error', 'message' => 'Booking tidak ditemukan.'], 404);
+        }
+
+        // Boleh review asalkan sesi sudah terkonfirmasi atau selesai
+        if (!in_array($booking->session_status, ['confirmed', 'completed'])) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya sesi yang sudah disetujui atau selesai yang bisa diberikan evaluasi.'], 400);
+        }
+
+        $existingReview = SessionReview::where('booking_id', $booking->id)
+            ->where('reviewer_id', $mentor->id)
+            ->first();
+
+        if ($existingReview) {
+            return response()->json(['status' => 'error', 'message' => 'Anda sudah memberikan evaluasi untuk mentee di sesi ini.'], 400);
+        }
+
+        try {
+            $review = SessionReview::create([
+                'booking_id'  => $booking->id,
+                'reviewer_id' => $mentor->id,      // Mentor yg memberikan
+                'reviewee_id' => $booking->mentee_id, // Mentee yg menerima
+                'rating'      => $request->rating,
+                'feedback'    => $request->feedback,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Evaluasi dan catatan untuk mentee berhasil disimpan.',
+                'data' => $review
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => 'Gagal menyimpan evaluasi: ' . $e->getMessage()], 500);
         }
     }
 }

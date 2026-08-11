@@ -245,4 +245,27 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(DailyDrill::class, 'user_id');
     }
+    /**
+     * Relasi ke profil mentor (Hanya berisi data jika role = 'mentor')
+     */
+    public function mentorProfile()
+    {
+        // Pastikan nama relasinya sama persis: mentorProfile
+        return $this->hasOne(MentorProfile::class, 'user_id', 'id');
+    }
+    /**
+     * Review yang DIBERIKAN oleh user ini.
+     */
+    public function reviewsGiven()
+    {
+        return $this->hasMany(SessionReview::class, 'reviewer_id');
+    }
+
+    /**
+     * Review yang DITERIMA oleh user ini (Berguna untuk nampilin ulasan di halaman profil Mentor).
+     */
+    public function reviewsReceived()
+    {
+        return $this->hasMany(SessionReview::class, 'reviewee_id');
+    }
 }

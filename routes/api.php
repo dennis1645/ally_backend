@@ -24,7 +24,7 @@ use App\Http\Controllers\MentorDocumentController;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\UserDeepDiagnosticController;
-use App\Http\Controllers\SupportTicketController; // Import Controller Support Ticket
+use App\Http\Controllers\SupportTicketController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -165,11 +165,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/chat', [AIMentorChatController::class, 'sendMessage']);
     });
 
-    // Mentor Booking
+    // ==========================================
+    // MENTOR BOOKING (SISI MENTEE)
+    // ==========================================
     Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
     Route::get('/my-bookings', [MentorBookingController::class, 'getMyBookings']);
     
-    // MENTOR MODULE (Mentor Only)
+    // [BARU] Mentee memberikan review ke Mentor
+    Route::post('/my-bookings/{bookingId}/review', [MentorBookingController::class, 'submitReview']);
+    
+    // ==========================================
+    // MENTOR MODULE (SISI MENTOR ONLY)
+    // ==========================================
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
         // Multi-Mentee Dashboard
         Route::get('/mentees', [MentorPortalController::class, 'getMenteeList']);
@@ -185,6 +192,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/bookings/{bookingId}/confirm', [MentorPortalController::class, 'confirmBooking']);
         Route::patch('/bookings/{bookingId}/reject', [MentorPortalController::class, 'rejectBooking']);
         Route::patch('/bookings/{bookingId}/reschedule', [MentorPortalController::class, 'rescheduleBooking']);
+
+        // [BARU] Mentor memberikan review/catatan evaluasi ke Mentee
+        Route::post('/bookings/{bookingId}/review', [MentorPortalController::class, 'submitMenteeReview']);
 
         // Custom Action Plan Generation (Pasca-Konsultasi)
         Route::post('/bookings/{bookingId}/action-plans', [MentorPortalController::class, 'storeActionPlan']);
