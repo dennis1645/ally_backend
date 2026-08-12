@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Scholarship;
 use App\Models\UserMilestone;
+use App\Models\MilestoneSubmission;
+use App\Models\DocumentVault;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Services\AITimelineService;
+use App\Services\GamificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Midtrans\Config;
 use Midtrans\Snap;
 
@@ -81,8 +86,10 @@ class MilestoneController extends Controller
                 'status' => 'success', 
                 'message' => 'Belum ada timeline yang ditemukan.',
                 'data' => [
-                    'is_user_premium' => (bool) $user->is_premium,
-                    'milestones' => []
+                    'is_user_premium'            => (bool) $user->is_premium,
+                    'readiness_score'            => (int) ($user->readiness_score ?? 0),
+                    'primary_scholarship_target' => $user->primary_scholarship_target,
+                    'milestones'                 => []
                 ]
             ], 200);
         }
@@ -91,8 +98,10 @@ class MilestoneController extends Controller
             'status' => 'success',
             'message' => 'Berhasil mengambil daftar timeline milestone.',
             'data' => [
-                'is_user_premium' => (bool) $user->is_premium,
-                'milestones' => $milestones
+                'is_user_premium'            => (bool) $user->is_premium,
+                'readiness_score'            => (int) ($user->readiness_score ?? 0),
+                'primary_scholarship_target' => $user->primary_scholarship_target,
+                'milestones'                 => $milestones
             ]
         ], 200);
     }
@@ -105,27 +114,6 @@ class MilestoneController extends Controller
 
         $user = Auth::user();
         
-        $existingMilestone = UserMilestone::where('user_id', $user->id)
-            ->whereNotNull('scholarship_id')
-            ->whereNull('parent_id')
-            ->latest('created_at')
-            ->first();
-
-        if ($existingMilestone) {
-            $activeScholarship = Scholarship::find($existingMilestone->scholarship_id);
-            
-            if ($activeScholarship) {
-                $activeDeadline = Carbon::parse($activeScholarship->deadline_date);
-                
-                if (Carbon::now()->lessThan($activeDeadline)) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Anda hanya bisa melakukan generate 1 kali. Anda sudah memiliki timeline aktif untuk beasiswa "' . $activeScholarship->name . '". Silakan tunggu sampai masa pendaftaran beasiswa tersebut habis pada ' . $activeDeadline->format('d M Y') . ' sebelum menargetkan beasiswa lain.',
-                    ], 403); 
-                }
-            }
-        }
-
         $scholarship = Scholarship::with('universities')->findOrFail($request->scholarship_id);
         $deadline = Carbon::parse($scholarship->deadline_date);
         
@@ -180,9 +168,29 @@ class MilestoneController extends Controller
 
         DB::beginTransaction();
         try {
-            UserMilestone::where('user_id', $user->id)
+            // 1. Cari semua ID milestone beasiswa lama user untuk membersihkan pengiriman jawaban
+            $oldMilestoneIds = UserMilestone::where('user_id', $user->id)
                 ->whereNotNull('scholarship_id')
-                ->delete();
+                ->pluck('id');
+
+            if ($oldMilestoneIds->isNotEmpty()) {
+                MilestoneSubmission::whereIn('user_milestone_id', $oldMilestoneIds)->delete();
+                UserMilestone::whereIn('id', $oldMilestoneIds)->delete();
+            }
+
+            // 2. Sync target beasiswa di profil user & pivot user_scholarships
+            $user->update([
+                'primary_scholarship_target' => $scholarship->name
+            ]);
+
+            DB::table('user_scholarships')->updateOrInsert(
+                ['user_id' => $user->id],
+                [
+                    'scholarship_id' => $scholarship->id,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ]
+            );
 
             $valleys = $journeyData['valleys'];
             
@@ -414,8 +422,12 @@ class MilestoneController extends Controller
         DB::beginTransaction();
         try {
             $milestone->status = 'completed';
+            $milestone->is_discovered = true;
             $milestone->completed_at = now();
             $milestone->save();
+
+            // Kaskade status discovered ke subtasks (jika ada)
+            $this->cascadeDiscoveredStatus($milestone->id, true);
 
             $user->xp_points += $milestone->xp_reward;
             $user->save();
@@ -426,8 +438,10 @@ class MilestoneController extends Controller
                 
                 if ($allTasksDone) {
                     $checkpoint->status = 'completed';
+                    $checkpoint->is_discovered = true;
                     $checkpoint->completed_at = now();
                     $checkpoint->save();
+                    $this->cascadeDiscoveredStatus($checkpoint->id, true);
 
                     if ($checkpoint->parent_id) {
                         $valley = UserMilestone::find($checkpoint->parent_id);
@@ -435,12 +449,17 @@ class MilestoneController extends Controller
                         
                         if ($allCheckpointsDone) {
                             $valley->status = 'completed';
+                            $valley->is_discovered = true;
                             $valley->completed_at = now();
                             $valley->save();
+                            $this->cascadeDiscoveredStatus($valley->id, true);
                         }
                     }
                 }
             }
+
+            // Update skor readiness user secara berkala & batasi max 100
+            $updatedReadinessScore = GamificationService::updateReadinessScore($user);
 
             DB::commit();
 
@@ -448,10 +467,11 @@ class MilestoneController extends Controller
                 'status' => 'success',
                 'message' => 'Task berhasil diselesaikan!',
                 'data' => [
-                    'milestone_id' => $milestone->id,
-                    'status' => $milestone->status,
-                    'earned_xp' => $milestone->xp_reward,
-                    'total_user_xp' => $user->xp_points
+                    'milestone_id'           => $milestone->id,
+                    'status'                 => $milestone->status,
+                    'earned_xp'              => $milestone->xp_reward,
+                    'total_user_xp'          => $user->xp_points,
+                    'updated_readiness_score' => $updatedReadinessScore
                 ]
             ], 200);
 
@@ -476,21 +496,193 @@ class MilestoneController extends Controller
             ], 404);
         }
 
-        if ($milestone->is_discovered) {
+        DB::beginTransaction();
+        try {
+            $milestone->is_discovered = true;
+            $milestone->save();
+
+            // Kaskade is_discovered = true ke semua anak (checkpoint & task)
+            $this->cascadeDiscoveredStatus($milestone->id, true);
+
+            DB::commit();
+
             return response()->json([
-                'status' => 'success', 
-                'message' => 'Milestone sudah ditandai discovered sebelumnya.', 
-                'data' => $milestone
+                'status' => 'success',
+                'message' => 'Milestone dan seluruh sub-task berhasil ditandai sebagai discovered.',
+                'data' => $milestone->fresh(['subTasks'])
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => 'Gagal mengubah status discovered: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function cascadeDiscoveredStatus($parentId, $status)
+    {
+        $children = UserMilestone::where('parent_id', $parentId)->get();
+        foreach ($children as $child) {
+            $child->is_discovered = $status;
+            $child->save();
+            $this->cascadeDiscoveredStatus($child->id, $status);
+        }
+    }
+
+    /**
+     * SUBMIT JAWABAN / DOKUMEN FASE MILESTONE TASK (MENTEE)
+     * Mentee menjawab task menggunakan teks, unggah berkas (otomatis tersimpan ke Document Vault), atau keduanya.
+     */
+    public function submitTask(Request $request, $id)
+    {
+        $user = Auth::user();
+
+        $milestone = UserMilestone::where('id', $id)->where('user_id', $user->id)->first();
+
+        if (!$milestone) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Task milestone tidak ditemukan.'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'text_response' => 'nullable|string',
+            'file'          => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,zip,rar|max:10240',
+            'file_type'     => 'nullable|in:cv,transcript,certificate,essay,loa,other',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+                'data' => $validator->errors()
+            ], 422);
+        }
+
+        if (!$request->filled('text_response') && !$request->hasFile('file')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Mohon isi jawaban teks atau unggah berkas dokumen.'
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $documentVaultId = null;
+            $filePath = null;
+            $fileName = null;
+
+            // Jika mentee mengunggah berkas dokumen -> Otomatis masuk ke Document Vault!
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $fileName = $file->getClientOriginalName();
+                $filePath = $file->store('vault_documents', 'public');
+
+                $vault = DocumentVault::create([
+                    'user_id'        => $user->id,
+                    'scholarship_id' => $milestone->scholarship_id,
+                    'university_id'  => $milestone->university_id,
+                    'file_name'      => $fileName,
+                    'file_path'      => $filePath,
+                    'mime_type'      => $file->getClientMimeType(),
+                    'file_size'      => $file->getSize(),
+                    'file_type'      => $request->file_type ?? 'essay',
+                    'status'         => 'uploaded',
+                    'is_encrypted'   => true,
+                ]);
+
+                $documentVaultId = $vault->id;
+            }
+
+            $submissionType = ($request->hasFile('file') && $request->filled('text_response'))
+                ? 'both'
+                : ($request->hasFile('file') ? 'document' : 'text');
+
+            // Simpan / update pengiriman jawaban task
+            $submission = MilestoneSubmission::updateOrCreate(
+                [
+                    'user_milestone_id' => $milestone->id,
+                    'user_id'           => $user->id,
+                ],
+                [
+                    'document_vault_id' => $documentVaultId,
+                    'submission_type'   => $submissionType,
+                    'text_response'     => $request->text_response,
+                    'file_path'         => $filePath,
+                    'file_name'         => $fileName,
+                    'review_status'     => 'pending',
+                    'mentor_feedback'   => null,
+                ]
+            );
+
+            // Ubah status milestone menjadi in_progress (menunggu peninjauan mentor)
+            $milestone->update(['status' => 'in_progress']);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Jawaban task berhasil dikirim! Dokumen otomatis tersimpan di Document Vault dan menunggu peninjauan mentor.',
+                'data' => [
+                    'submission_id'     => $submission->id,
+                    'milestone_id'      => $milestone->id,
+                    'submission_type'   => $submission->submission_type,
+                    'text_response'     => $submission->text_response,
+                    'file_name'         => $submission->file_name,
+                    'file_url'          => $submission->file_path ? asset(Storage::url($submission->file_path)) : null,
+                    'document_vault_id' => $submission->document_vault_id,
+                    'review_status'     => $submission->review_status,
+                    'submitted_at'      => $submission->updated_at->format('Y-m-d H:i:s')
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengunggah jawaban task: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * GET DETAIL JAWABAN / SUBMISSION MENTEE UNTUK TASK MILESTONE
+     */
+    public function getTaskSubmission(Request $request, $id)
+    {
+        $user = Auth::user();
+
+        $submission = MilestoneSubmission::with(['documentVault', 'reviewer:id,name,email'])
+            ->where('user_milestone_id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$submission) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Belum ada pengiriman jawaban untuk task ini.',
+                'data' => null
             ], 200);
         }
 
-        $milestone->is_discovered = true;
-        $milestone->save();
-
         return response()->json([
             'status' => 'success',
-            'message' => 'Milestone berhasil ditandai sebagai discovered.',
-            'data' => $milestone
+            'message' => 'Detail pengiriman jawaban task berhasil dimuat.',
+            'data' => [
+                'submission_id'     => $submission->id,
+                'user_milestone_id' => $submission->user_milestone_id,
+                'submission_type'   => $submission->submission_type,
+                'text_response'     => $submission->text_response,
+                'file_name'         => $submission->file_name,
+                'file_url'          => $submission->file_path ? asset(Storage::url($submission->file_path)) : null,
+                'document_vault'    => $submission->documentVault,
+                'review_status'     => $submission->review_status,
+                'mentor_feedback'   => $submission->mentor_feedback,
+                'rating'            => $submission->rating,
+                'xp_awarded'        => $submission->xp_awarded,
+                'reviewed_by'       => $submission->reviewer->name ?? null,
+                'reviewed_at'       => $submission->reviewed_at ? $submission->reviewed_at->format('Y-m-d H:i:s') : null,
+            ]
         ], 200);
     }
 }

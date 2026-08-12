@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Models\User;
 use App\Models\ConsultationBooking;
 
@@ -156,6 +157,159 @@ class AdminFinanceController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => 'Gagal memproses pencairan: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * 4. GET CONSULTATION PROOFS & DATA (ADMIN AUDIT)
+     * Menampilkan daftar sesi konsultasi yang memiliki foto bukti pelaksanaan.
+     */
+    public function getConsultationProofs(Request $request)
+    {
+        $admin = Auth::user();
+        if ($admin->role !== 'admin') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $query = ConsultationBooking::with([
+            'mentor:id,name,email,session_rate,earning_balance', 
+            'mentee:id,name,email', 
+            'availability'
+        ])->where(function($q) {
+            $q->whereNotNull('session_proof')
+              ->orWhere('session_status', 'completed');
+        });
+
+        // Filter berdasarkan proof_status (pending, approved, rejected)
+        if ($request->has('proof_status') && in_array($request->proof_status, ['pending', 'approved', 'rejected'])) {
+            $query->where('proof_status', $request->proof_status);
+        }
+
+        // Filter berdasarkan mentor_id
+        if ($request->has('mentor_id')) {
+            $query->where('mentor_id', $request->mentor_id);
+        }
+
+        $consultations = $query->orderBy('updated_at', 'desc')->get()->map(function ($booking) {
+            return [
+                'booking_id' => $booking->id,
+                'session_status' => $booking->session_status,
+                'proof_status' => $booking->proof_status ?? 'pending',
+                'proof_review_notes' => $booking->proof_review_notes,
+                'session_proof' => $booking->session_proof,
+                'session_proof_url' => $booking->session_proof ? asset(Storage::url($booking->session_proof)) : null,
+                'meeting_link' => $booking->meeting_link,
+                'mentor_earned_fee' => (float) $booking->mentor_earned_fee,
+                'scheduled_date' => $booking->availability->available_date ?? null,
+                'time_slot' => ($booking->availability->start_time ?? '') . ' - ' . ($booking->availability->end_time ?? ''),
+                'mentor' => [
+                    'id' => $booking->mentor->id ?? null,
+                    'name' => $booking->mentor->name ?? null,
+                    'email' => $booking->mentor->email ?? null,
+                    'current_balance' => (float) ($booking->mentor->earning_balance ?? 0),
+                ],
+                'mentee' => [
+                    'id' => $booking->mentee->id ?? null,
+                    'name' => $booking->mentee->name ?? null,
+                    'email' => $booking->mentee->email ?? null,
+                ],
+                'completed_at' => $booking->updated_at->format('Y-m-d H:i:s')
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Daftar bukti dan data konsultasi mentor berhasil dimuat.',
+            'data' => $consultations
+        ], 200);
+    }
+
+    /**
+     * 5. VERIFY CONSULTATION PROOF (APPROVE / REJECT WITHHOLD PAYOUT)
+     * Admin memeriksa keabsahan foto bukti sesi. Jika ditolak, bayaran mentor ditangguhkan/dikurangi.
+     */
+    public function verifyConsultationProof(Request $request, $bookingId)
+    {
+        $admin = Auth::user();
+        if ($admin->role !== 'admin') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:approved,rejected',
+            'admin_notes' => 'nullable|string|max:500',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $booking = ConsultationBooking::with(['mentor'])->where('id', $bookingId)->first();
+
+            if (!$booking) {
+                return response()->json(['status' => 'error', 'message' => 'Data konsultasi tidak ditemukan.'], 404);
+            }
+
+            $oldProofStatus = $booking->proof_status ?? 'pending';
+            $newProofStatus = $request->status;
+            $fee = (float) $booking->mentor_earned_fee;
+
+            $mentor = User::where('id', $booking->mentor_id)->lockForUpdate()->first();
+
+            if ($newProofStatus === 'rejected') {
+                // Jika sebelumnya belum ditolak (misal pending atau approved), kurangi saldo dompet mentor (tangguhkan bayaran)
+                if ($oldProofStatus !== 'rejected' && $mentor && $fee > 0) {
+                    $mentor->decrement('earning_balance', $fee);
+                }
+
+                $booking->update([
+                    'proof_status' => 'rejected',
+                    'proof_review_notes' => $request->admin_notes ?? 'Bukti sesi tidak valid / ditolak oleh Admin. Bayaran ditangguhkan.',
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => "Bukti sesi konsultasi (ID: {$booking->id}) dinyatakan TIDAK VALID. Bayaran mentor sebesar Rp " . number_format($fee, 0, ',', '.') . " berhasil ditangguhkan.",
+                    'data' => [
+                        'booking_id' => $booking->id,
+                        'proof_status' => 'rejected',
+                        'proof_review_notes' => $booking->proof_review_notes,
+                        'mentor_id' => $mentor->id ?? null,
+                        'mentor_name' => $mentor->name ?? null,
+                        'updated_earning_balance' => (float) ($mentor->earning_balance ?? 0)
+                    ]
+                ], 200);
+
+            } else { // approved
+                // Jika sebelumnya sempat ditolak, kembalikan saldo ke dompet mentor
+                if ($oldProofStatus === 'rejected' && $mentor && $fee > 0) {
+                    $mentor->increment('earning_balance', $fee);
+                }
+
+                $booking->update([
+                    'proof_status' => 'approved',
+                    'proof_review_notes' => $request->admin_notes ?? 'Bukti sesi valid & telah disetujui Admin.',
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => "Bukti sesi konsultasi (ID: {$booking->id}) dinyatakan VALID dan disetujui. Bayaran mentor Rp " . number_format($fee, 0, ',', '.') . " siap dicairkan.",
+                    'data' => [
+                        'booking_id' => $booking->id,
+                        'proof_status' => 'approved',
+                        'proof_review_notes' => $booking->proof_review_notes,
+                        'mentor_id' => $mentor->id ?? null,
+                        'mentor_name' => $mentor->name ?? null,
+                        'updated_earning_balance' => (float) ($mentor->earning_balance ?? 0)
+                    ]
+                ], 200);
+            }
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => 'Gagal memverifikasi bukti sesi: ' . $e->getMessage()], 500);
         }
     }
 }

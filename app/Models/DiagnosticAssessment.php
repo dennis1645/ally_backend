@@ -13,6 +13,7 @@ class DiagnosticAssessment extends Model
         'user_id',
         'guest_token',
         'assessment_type',
+        'recommended_scholarship_id',
         'reason',
         // Data utama hasil AI
         'readiness_percentage',
@@ -42,5 +43,11 @@ class DiagnosticAssessment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Relasi ke rekomendasi beasiswa dari AI
+    public function recommendedScholarship()
+    {
+        return $this->belongsTo(Scholarship::class, 'recommended_scholarship_id');
     }
 }

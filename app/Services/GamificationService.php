@@ -42,4 +42,39 @@ class GamificationService
             'new_badges_awarded' => $awardedBadges // Frontend bisa baca ini untuk nampilin animasi!
         ];
     }
+
+    /**
+     * Hitung ulang dan update skor readiness user berdasarkan penyelesaian task & valley.
+     * Skor bertambah naik terus hingga maksimal 100%. Jika > 100 dibulatkan/dibatasi ke 100.
+     */
+    public static function updateReadinessScore(User $user)
+    {
+        $totalScholarshipTasks = \App\Models\UserMilestone::where('user_id', $user->id)
+            ->whereNotNull('scholarship_id')
+            ->count();
+
+        if ($totalScholarshipTasks > 0) {
+            $completedTasks = \App\Models\UserMilestone::where('user_id', $user->id)
+                ->whereNotNull('scholarship_id')
+                ->where('status', 'completed')
+                ->count();
+
+            // Hitung persentase tugas yang sudah selesai
+            $completionPercent = (int) round(($completedTasks / $totalScholarshipTasks) * 100);
+
+            // Nilai readiness bertambah secara progresif (minimal tidak pernah turun dari readiness_score yang ada)
+            $newScore = max((int) $user->readiness_score, $completionPercent);
+
+            // Dibatasi maksimal 100
+            $finalScore = min(100, $newScore);
+
+            $user->update(['readiness_score' => $finalScore]);
+            return $finalScore;
+        } else {
+            // Jika belum ada timeline beasiswa, tambah 5 poin per penyelesaian task dasar (maksimal 100)
+            $finalScore = min(100, (int) $user->readiness_score + 5);
+            $user->update(['readiness_score' => $finalScore]);
+            return $finalScore;
+        }
+    }
 }

@@ -24,15 +24,18 @@ class AIMentorChatController extends Controller
         $user = Auth::user();
         $userMessage = $request->input('message');
 
-        // Panggil service AI Mentor dengan membawa konteks user
-        $aiReply = $this->chatService->chat($user, $userMessage);
+        // Panggil service AI Mentor dengan membawa konteks lengkap user & Gemini API
+        $chatData = $this->chatService->chat($user, $userMessage);
 
         return response()->json([
             'status' => 'success',
+            'message' => 'AI Mentor response generated successfully.',
             'data' => [
-                'sender' => 'ai_mentor',
-                'message' => $aiReply,
-                'timestamp' => now()->toIso8601String()
+                'sender'          => 'ai_mentor',
+                'user_message'    => $chatData['user_message'],
+                'ai_response'     => $chatData['ai_response'],
+                'context_summary' => $chatData['context_summary'],
+                'timestamp'       => now()->toIso8601String()
             ]
         ], 200);
     }

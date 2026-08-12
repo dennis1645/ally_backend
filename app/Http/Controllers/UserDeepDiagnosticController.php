@@ -7,6 +7,7 @@ use App\Models\DiagnosticOption;
 use App\Models\DiagnosticAssessment;
 use App\Models\UserMilestone; // <-- TAMBAHAN: Import Model UserMilestone
 use App\Models\User;
+use App\Models\Scholarship;
 use App\Services\GamificationService;
 use App\Services\AIDiagnosticService;
 use Illuminate\Http\Request;
@@ -134,45 +135,127 @@ class UserDeepDiagnosticController extends Controller
             'assessment_2'
         );
 
-        $aiData = $aiResponse['data']['assessment'] ?? $aiResponse['data'] ?? $aiResponse;
+        // Extract data asesmen dari struktur nested respons Llama AI
+        $aiAssessmentData = $aiResponse['data']['assessment'] ?? $aiResponse['data'] ?? $aiResponse;
 
-        if (!$aiResponse || empty($aiData) || (isset($aiResponse['status']) && $aiResponse['status'] !== 'success')) {
-            $aiData = [
+        if (!$aiResponse || empty($aiAssessmentData) || (isset($aiResponse['status']) && $aiResponse['status'] !== 'success' && $aiResponse['status'] !== 200)) {
+            $aiAssessmentData = [
                 'revised_percentage' => 0,
-                'suggestion' => 'Gagal terhubung ke server AI saat menganalisis. Silakan coba lagi.'
+                'suggestion'         => 'Gagal terhubung ke server AI saat menganalisis. Silakan coba lagi.'
             ];
+        }
+
+        // Extract rekomendasi beasiswa dari AI (kunci: beasiswa_recomendation / scholarship_recommendation)
+        $recommendedScholarshipId = null;
+        $rawRec = $aiAssessmentData['beasiswa_recomendation']
+            ?? $aiResponse['data']['beasiswa_recomendation']
+            ?? $aiResponse['beasiswa_recomendation'] 
+            ?? $aiAssessmentData['beasiswa_recommendation'] 
+            ?? $aiAssessmentData['scholarship_recommendation'] 
+            ?? $aiAssessmentData['recommended_scholarship_id'] 
+            ?? null;
+
+        if ($rawRec) {
+            $scholarshipName = null;
+            $possibleNumericId = null;
+
+            if (is_array($rawRec)) {
+                // Ambil nama dari metadata.name, name, title, atau parse dari text
+                $scholarshipName = $rawRec['metadata']['name'] 
+                    ?? $rawRec['name'] 
+                    ?? $rawRec['title'] 
+                    ?? null;
+
+                if (!$scholarshipName && !empty($rawRec['text'])) {
+                    // Contoh text: "Scholarship Name:\nLPDP Scholarship\n..."
+                    if (preg_match('/Scholarship Name:\s*([^\n\r]+)/i', $rawRec['text'], $matches)) {
+                        $scholarshipName = trim($matches[1]);
+                    }
+                }
+
+                // Cek jika ID AI kebetulan numerik yang merujuk ke database kita
+                if (isset($rawRec['id']) && is_numeric($rawRec['id'])) {
+                    $possibleNumericId = (int) $rawRec['id'];
+                }
+            } elseif (is_numeric($rawRec)) {
+                $possibleNumericId = (int) $rawRec;
+            } elseif (is_string($rawRec)) {
+                $scholarshipName = $rawRec;
+            }
+
+            // A. Pertama, coba cari di DB kita berdasarkan ID numerik (jika ada)
+            if ($possibleNumericId) {
+                $foundScholarship = Scholarship::find($possibleNumericId);
+                if ($foundScholarship) {
+                    $recommendedScholarshipId = $foundScholarship->id;
+                }
+            }
+
+            // B. Jika belum ketemu, cari di DB kita berdasarkan NAMA beasiswa (Scholarship Matcher ke DB lokal)
+            if (!$recommendedScholarshipId && $scholarshipName) {
+                $cleanName = trim($scholarshipName);
+
+                // 1. Exact match
+                $foundScholarship = Scholarship::where('name', $cleanName)->first();
+
+                // 2. Fuzzy match (%Nama%)
+                if (!$foundScholarship) {
+                    $foundScholarship = Scholarship::where('name', 'LIKE', '%' . $cleanName . '%')->first();
+                }
+
+                // 3. Match kata utama (misal "LPDP" dari "LPDP Scholarship")
+                if (!$foundScholarship) {
+                    $firstWord = strtok($cleanName, " ");
+                    if (strlen($firstWord) >= 3) {
+                        $foundScholarship = Scholarship::where('name', 'LIKE', '%' . $firstWord . '%')->first();
+                    }
+                }
+
+                if ($foundScholarship) {
+                    $recommendedScholarshipId = $foundScholarship->id;
+                }
+            }
+
+            // C. Fallback: Jika di DB lokal belum ada beasiswa yang cocok sama sekali, gunakan beasiswa pertama di database sebagai default
+            if (!$recommendedScholarshipId) {
+                $defaultScholarship = Scholarship::first();
+                if ($defaultScholarship) {
+                    $recommendedScholarshipId = $defaultScholarship->id;
+                }
+            }
         }
 
         DB::beginTransaction();
         try {
             $assessmentData = [
-                'assessment_type' => 'assessment_2', 
-                'user_id' => $user->id,
-                'guest_token' => null,
-                'raw_answers' => json_encode($userAnswersForAI), 
-                'readiness_percentage' => $aiData['revised_percentage'] ?? $user->readiness_score ?? 0,
-                'reason' => $aiData['suggestion'] ?? null, 
-                'readiness_level' => null,
-                'academic_score' => 0,
-                'scholarship_goal_score' => 0,
-                'leadership_score' => 0,
-                'achievements_score' => 0,
-                'english_score' => 0,
-                'application_score' => 0,
-                'strengths_mapping' => [],
-                'improvements_mapping' => [],
+                'assessment_type'            => 'assessment_2', 
+                'user_id'                    => $user->id,
+                'guest_token'                => null,
+                'recommended_scholarship_id' => $recommendedScholarshipId,
+                'raw_answers'                => json_encode($userAnswersForAI), 
+                'readiness_percentage'       => $aiAssessmentData['revised_percentage'] ?? $user->readiness_score ?? 0,
+                'reason'                     => $aiAssessmentData['suggestion'] ?? null, 
+                'readiness_level'            => null,
+                'academic_score'             => 0,
+                'scholarship_goal_score'     => 0,
+                'leadership_score'           => 0,
+                'achievements_score'         => 0,
+                'english_score'              => 0,
+                'application_score'          => 0,
+                'strengths_mapping'          => [],
+                'improvements_mapping'       => [],
             ];
 
             $assessment = DiagnosticAssessment::updateOrCreate(
                 [
-                    'user_id' => $user->id, 
+                    'user_id'         => $user->id, 
                     'assessment_type' => 'assessment_2' 
                 ],
                 $assessmentData
             );
 
             $user->update([
-                'readiness_score' => $aiData['revised_percentage'] ?? $user->readiness_score
+                'readiness_score' => $aiAssessmentData['revised_percentage'] ?? $user->readiness_score
             ]);
 
             // ====================================================
@@ -187,8 +270,9 @@ class UserDeepDiagnosticController extends Controller
             // Jika Fase 2 ditemukan dan belum selesai, otomatis selesaikan!
             if ($fase2Milestone && $fase2Milestone->status !== 'completed') {
                 $fase2Milestone->update([
-                    'status' => 'completed',
-                    'completed_at' => now()
+                    'status'        => 'completed',
+                    'is_discovered' => true,
+                    'completed_at'  => now()
                 ]);
                 
                 // Tambahkan XP Reward dari Fase 2 ke poin user
@@ -225,7 +309,8 @@ class UserDeepDiagnosticController extends Controller
     {
         $user = Auth::guard('sanctum')->user();
         
-        $assessment = DiagnosticAssessment::where('user_id', $user->id)
+        $assessment = DiagnosticAssessment::with(['recommendedScholarship'])
+            ->where('user_id', $user->id)
             ->where('assessment_type', 'assessment_2') 
             ->first();
 
@@ -237,13 +322,22 @@ class UserDeepDiagnosticController extends Controller
         }
 
         $formattedData = [
-            'id'                 => $assessment->id,
-            'user_id'            => $assessment->user_id,
-            'assessment_type'    => $assessment->assessment_type,
-            'revised_percentage' => $assessment->readiness_percentage, 
-            'suggestion'         => $assessment->reason,               
-            'created_at'         => $assessment->created_at,
-            'updated_at'         => $assessment->updated_at,
+            'id'                         => $assessment->id,
+            'user_id'                    => $assessment->user_id,
+            'assessment_type'            => $assessment->assessment_type,
+            'revised_percentage'         => $assessment->readiness_percentage, 
+            'suggestion'                 => $assessment->reason,
+            'recommended_scholarship_id' => $assessment->recommended_scholarship_id,
+            'beasiswa_recomendation'     => $assessment->recommendedScholarship ? [
+                'id'               => $assessment->recommendedScholarship->id,
+                'name'             => $assessment->recommendedScholarship->name,
+                'provider_country' => $assessment->recommendedScholarship->provider_country,
+                'funding_type'     => $assessment->recommendedScholarship->funding_type,
+                'deadline_date'    => $assessment->recommendedScholarship->deadline_date,
+                'image_url'        => $assessment->recommendedScholarship->image_url,
+            ] : null,
+            'created_at'                 => $assessment->created_at,
+            'updated_at'                 => $assessment->updated_at,
         ];
 
         return response()->json([
@@ -251,5 +345,105 @@ class UserDeepDiagnosticController extends Controller
             'message' => 'Deep assessment result retrieved successfully.',
             'data' => $formattedData
         ]);
+    }
+
+    /**
+     * 4. SETUJU ATAU TOLAK REKOMENDASI BEASISWA DARI AI
+     * Jika setuju (accept: true): Simpan beasiswa rekomendasi AI ke tabel user_scholarships & update target beasiswa user.
+     * Jika tidak setuju (accept: false): Kosongkan recommended_scholarship_id menjadi null (user milih mandiri).
+     */
+    public function chooseRecommendation(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $request->validate([
+            'accept'         => 'required|boolean',
+            'scholarship_id' => 'nullable|exists:scholarships,id',
+        ]);
+
+        $assessment = DiagnosticAssessment::where('user_id', $user->id)
+            ->where('assessment_type', 'assessment_2')
+            ->first();
+
+        if (!$assessment) {
+            return response()->json(['status' => 'error', 'message' => 'Data hasil Assessment 2 belum ditemukan.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            if ($request->accept) {
+                $targetScholarshipId = $request->scholarship_id ?? $assessment->recommended_scholarship_id;
+
+                if (!$targetScholarshipId) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Tidak ada rekomendasi beasiswa dari AI untuk disetujui. Silakan tentukan ID beasiswa.'
+                    ], 400);
+                }
+
+                $scholarship = Scholarship::find($targetScholarshipId);
+
+                if (!$scholarship) {
+                    return response()->json(['status' => 'error', 'message' => 'Data beasiswa tidak ditemukan.'], 404);
+                }
+
+                // 1. Simpan ke tabel user_scholarships
+                DB::table('user_scholarships')->updateOrInsert(
+                    ['user_id' => $user->id],
+                    [
+                        'scholarship_id' => $scholarship->id,
+                        'created_at'     => now(),
+                        'updated_at'     => now(),
+                    ]
+                );
+
+                // 2. Update target beasiswa utama di profil user
+                $user->update([
+                    'primary_scholarship_target' => $scholarship->name
+                ]);
+
+                // 3. Update status rekomendasi di assessment
+                $assessment->update([
+                    'recommended_scholarship_id' => $scholarship->id
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => "Rekomendasi beasiswa '{$scholarship->name}' berhasil disetujui dan disimpan sebagai target beasiswa Anda!",
+                    'data' => [
+                        'user_id'               => $user->id,
+                        'primary_target'        => $scholarship->name,
+                        'scholarship_detail'    => $scholarship
+                    ]
+                ], 200);
+
+            } else { // decline
+                // Jika user menolak rekomendasi AI -> set recommended_scholarship_id menjadi null
+                $assessment->update([
+                    'recommended_scholarship_id' => null
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Rekomendasi beasiswa ditolak. Anda dapat memilih target beasiswa secara mandiri dari katalog.',
+                    'data' => [
+                        'user_id'                    => $user->id,
+                        'recommended_scholarship_id' => null
+                    ]
+                ], 200);
+            }
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => 'Gagal memproses rekomendasi beasiswa: ' . $e->getMessage()], 500);
+        }
     }
 }

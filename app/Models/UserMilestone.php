@@ -16,25 +16,25 @@ class UserMilestone extends Model
         'university_id',
         'task_name',
         'description',
-        'step_order',     // Ditambahkan
-        'is_premium',     // Ditambahkan
-        'target_deadline',
+        'step_order',     
+        'is_premium',     
         'start_date',
-    'target_date',
+        'target_date',
         'status',
         'completed_at',
         'source',
         'is_mandatory',
-        'is_discovered',  // Ditambahkan
+        'is_discovered',  
         'xp_reward',
     ];
 
     protected $casts = [
-        'is_premium' => 'boolean', // Casting boolean
-        'is_mandatory' => 'boolean',
-        'is_discovered' => 'boolean', // Casting boolean
-        'target_deadline' => 'date',
-        'completed_at' => 'datetime',
+        'is_premium'    => 'boolean',
+        'is_mandatory'  => 'boolean',
+        'is_discovered' => 'boolean',
+        'start_date'    => 'date',
+        'target_date'   => 'date',
+        'completed_at'  => 'datetime',
     ];
 
     // ==========================================
@@ -74,5 +74,15 @@ class UserMilestone extends Model
     public function university()
     {
         return $this->belongsTo(University::class);
+    }
+
+    public function submissions()
+    {
+        return $this->hasMany(MilestoneSubmission::class, 'user_milestone_id');
+    }
+
+    public function latestSubmission()
+    {
+        return $this->hasOne(MilestoneSubmission::class, 'user_milestone_id')->latestOfMany();
     }
 }

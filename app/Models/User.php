@@ -66,7 +66,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var array
      */
-    protected $appends = ['level'];
+    protected $appends = ['level', 'target_scholarship_id', 'target_scholarship_data'];
 
     /**
      * Get the attributes that should be cast.
@@ -108,6 +108,57 @@ class User extends Authenticatable implements MustVerifyEmail
         
         // Membatasi level maksimal di 100
         return $calculatedLevel > 100 ? 100 : (int) $calculatedLevel;
+    }
+
+    /**
+     * Accessor untuk ID Beasiswa Target Utama User.
+     */
+    public function getTargetScholarshipIdAttribute(): ?int
+    {
+        // 1. Cek dari pivot table user_scholarships
+        $scholarshipId = \Illuminate\Support\Facades\DB::table('user_scholarships')
+            ->where('user_id', $this->id)
+            ->value('scholarship_id');
+
+        if ($scholarshipId) {
+            return (int) $scholarshipId;
+        }
+
+        // 2. Fallback: Cek dari user_milestones aktif user
+        $milestoneScholarshipId = UserMilestone::where('user_id', $this->id)
+            ->whereNotNull('scholarship_id')
+            ->value('scholarship_id');
+
+        if ($milestoneScholarshipId) {
+            return (int) $milestoneScholarshipId;
+        }
+
+        // 3. Fallback: Match berdasarkan nama primary_scholarship_target
+        if ($this->primary_scholarship_target) {
+            $matchedId = Scholarship::where('name', $this->primary_scholarship_target)
+                ->orWhere('name', 'LIKE', '%' . $this->primary_scholarship_target . '%')
+                ->value('id');
+
+            if ($matchedId) {
+                return (int) $matchedId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Accessor untuk Data Detail Beasiswa Target Utama User.
+     */
+    public function getTargetScholarshipDataAttribute()
+    {
+        $scholarshipId = $this->target_scholarship_id;
+
+        if (!$scholarshipId) {
+            return null;
+        }
+
+        return Scholarship::with('universities:id,name,country,city,image_url')->find($scholarshipId);
     }
 
     // ==========================================

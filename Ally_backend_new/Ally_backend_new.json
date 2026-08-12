@@ -1,0 +1,2574 @@
+{
+  "info": {
+    "_postman_id": "6922663b-4af4-413b-9a18-d836ce820a21",
+    "name": "Ally_backend_new",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "56023867",
+    "_collection_link": "https://go.postman.co/collection/56023867-6922663b-4af4-413b-9a18-d836ce820a21?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"phone_number\": \"081234267821\",\r\n    \"password\": \"StrongPassword123!\",\r\n    \"password_confirmation\": \"StrongPassword123!\",\r\n    \"guest_token\": \"token-unik-worstcase-initial-001\" \r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Mentor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"khalisa.mentor@gmail.com\",\r\n    \"password\": \"P@ssw0rd123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"password\": \"StrongPassword123!\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"juna.admin@gmail.com\",\r\n    \"password\": \"P@ssw0rd123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lupa Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ubah Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"token\": \"c9a58601560d570713bd6de071054c9cc1e874954ae16c9ecb8a62887eea381c\",\r\n    \"password\": \"PasswordBaru123!\",\r\n    \"password_confirmation\": \"PasswordBaru123!\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reset-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Midtrans Webhook Callback (Payment Gateway - Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"transaction_time\": \"2026-08-04 10:00:00\",\r\n    \"transaction_status\": \"settlement\",\r\n    \"transaction_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\r\n    \"status_message\": \"midtrans payment notification\",\r\n    \"status_code\": \"200\",\r\n    \"signature_key\": \"generated_signature_key_from_midtrans\",\r\n    \"payment_type\": \"qris\",\r\n    \"order_id\": \"ORDER-1699999999-1\",\r\n    \"merchant_id\": \"M123456\",\r\n    \"gross_amount\": \"50000.00\",\r\n    \"fraud_status\": \"accept\",\r\n    \"currency\": \"IDR\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/midtrans/webhook",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "midtrans",
+                "webhook"
+              ]
+            },
+            "description": "Endpoint publik (tanpa Bearer Token) yang dipanggil langsung oleh server Midtrans."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Ambil Data Profile User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Budi Rahajo jumanto",
+                  "type": "text"
+                },
+                {
+                  "key": "phone_number",
+                  "value": "081234567890",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "male",
+                  "type": "text"
+                },
+                {
+                  "key": "headline",
+                  "value": "AI Engineer & Full-stack Developer",
+                  "type": "text"
+                },
+                {
+                  "key": "bio",
+                  "value": "Saya adalah mahasiswa yang tertarik dengan Cyber Security dan AI.",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/update-profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "update-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ubah password lewat profile",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"current_password\": \"PasswordBaru123!\",\r\n    \"password\": \"PasswordBaru456@\",\r\n    \"password_confirmation\": \"PasswordBaru456@\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "change-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profil Akademik & Target Beasiswa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"gpa\": \"3.85\",\r\n    \"undergraduate_major\": \"Informatics Engineering\",\r\n    \"target_major\": \"Artificial Intelligence\",\r\n    \"primary_scholarship_target\": \"LPDP Master Degree\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/profile/academic-target",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "academic-target"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Manage Users",
+          "item": [
+            {
+              "name": "Ambil Semua Data User",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/get-users",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "get-users"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User Detail (Melihat 1 User Spesifik)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/get-user-detail/2",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "get-user-detail",
+                    "2"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create User (Membuat User/Mentor Baru)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"sicsmanda12@gmail.com\",\r\n    \"phone_number\": \"081199498888\",\r\n    \"gender\": \"male\",\r\n    \"role\": \"mentor\",\r\n    \"password\": \"PasswordKuat123!\",\r\n    \"is_premium\": false\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/create-user",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "create-user"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update User (Mengubah Data Diri User)",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"name\": \"Jane Doe Updated\",\r\n    \"role\": \"mentor\",\r\n    \"is_premium\": true\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/update-user/2",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "update-user",
+                    "2"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Password (Admin Paksa Ubah Password)",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"password\": \"NewPassword123@\",\r\n    \"password_confirmation\": \"NewPassword123@\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/update-user-password/4",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "update-user-password",
+                    "4"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle User Status (Suspend / Activate)",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/toggle-user-status/4",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "toggle-user-status",
+                    "4"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete User",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/delete-user/2",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "delete-user",
+                    "2"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Restore Data User",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/restore-user/2",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "restore-user",
+                    "2"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage  University",
+          "item": [
+            {
+              "name": "Create University",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "Universitas Indonesia",
+                      "type": "text"
+                    },
+                    {
+                      "key": "country",
+                      "value": "Indonesia",
+                      "type": "text"
+                    },
+                    {
+                      "key": "city",
+                      "value": "Depok, Jawa Barat",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Kampus riset terbaik di Indonesia.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/create-university",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "create-university"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update University",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "Universitas Indonesia Updated",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/update-university/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "update-university",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Soft Delete University",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/delete-university/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "delete-university",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Restore University",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/restore-university/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "restore-university",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage Beasiswa",
+          "item": [
+            {
+              "name": "CREATE Beasiswa",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "Beasiswa LPDP Reguler",
+                      "type": "text"
+                    },
+                    {
+                      "key": "provider_country",
+                      "value": "Indonesia",
+                      "type": "text"
+                    },
+                    {
+                      "key": "funding_type",
+                      "value": "fully_funded",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/create-scholarship",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "create-scholarship"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "UPDATE Beasiswa",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "LPDP Reguler 2026 - Batch 2",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/update-scholarship/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "update-scholarship",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE Beasiswa",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/delete-scholarship/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "delete-scholarship",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "RESTORE Beasiswa",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/restore-scholarship/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "restore-scholarship",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage Assesment",
+          "item": [
+            {
+              "name": "Get All Diagnostic Questions",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Import Excel (Bulk Upload)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions/import",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions",
+                    "import"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Question Manually",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"question_text\": \"Berapa skor IELTS atau TOEFL ITP yang kamu miliki saat ini?\",\r\n  \"category\": \"scholarship\",\r\n  \"order_number\": 1,\r\n  \"options\": [\r\n    {\r\n      \"option_text\": \"IELTS di atas 6.5 atau TOEFL ITP di atas 550\",\r\n      \"score_weight\": 10,\r\n      \"weakness_tag\": null,\r\n      \"strength_tag\": \"strong_english_proficiency\"\r\n    }\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Question",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions/2",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions",
+                    "2"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Question",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"question_text\": \"Berapa skor IELTS yang kamu miliki saat ini? (Updated)\",\r\n  \"category\": \"language\",\r\n  \"order_number\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions/3",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions",
+                    "3"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Clear All Questions",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/diagnostic-questions/clear-all",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "diagnostic-questions",
+                    "clear-all"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Keuangan & Verifikasi Konsultasi Mentor",
+          "item": [
+            {
+              "name": "Menampilkan Daftar Keuangan Seluruh Mentor",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/finances/mentors",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "finances",
+                    "mentors"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mengubah Tarif Gaji Mentor (Session Rate)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"session_rate\": 200000\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/finances/mentors/2/rate",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "finances",
+                    "mentors",
+                    "2",
+                    "rate"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Memproses Pencairan Dana Mentor (Payout)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"amount\": 500000,\r\n    \"notes\": \"Pencairan periode Agustus 2026 ke rekening BCA.\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/finances/mentors/2/payout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "finances",
+                    "mentors",
+                    "2",
+                    "payout"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Inspeksi Bukti & Data Konsultasi Mentor",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/finances/consultations?proof_status=pending",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "finances",
+                    "consultations"
+                  ],
+                  "query": [
+                    {
+                      "key": "proof_status",
+                      "value": "pending",
+                      "description": "Pilihan: pending, approved, rejected"
+                    }
+                  ]
+                },
+                "description": "Admin memeriksa daftar sesi konsultasi yang telah diselesaikan mentor beserta foto bukti pelaksanaan sesi (session_proof)."
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Verifikasi / Penangguhan Bayaran Mentor (Approve / Reject Proof)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"status\": \"rejected\",\r\n    \"admin_notes\": \"Foto bukti sesi tidak jelas / buram. Bayaran mentor ditangguhkan.\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/finances/consultations/1/verify-proof",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "finances",
+                    "consultations",
+                    "1",
+                    "verify-proof"
+                  ]
+                },
+                "description": "Jika status 'rejected', bayaran mentor untuk sesi ini akan otomatis ditangguhkan/dikurangi dari dompet mentor. Jika status 'approved', bukti dinyatakan valid dan bayaran siap dicairkan."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Statistik",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/dashboard/stats",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "dashboard",
+                    "stats"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage Ticketing User",
+          "item": [
+            {
+              "name": "Admin Balas Ticket",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"reply_message\": \"Halo Kak, kami sedang melakukan pengecekan mutasi GoPay pada server Midtrans kami.\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/support/tickets/3/reply",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "support",
+                    "tickets",
+                    "3",
+                    "reply"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Admin Selesaikan Ticket",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"final_message\": \"Sinkronisasi berhasil! Akun Anda telah kami aktifkan sebagai Premium.\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/admin/support/tickets/3/resolve",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "support",
+                    "tickets",
+                    "3",
+                    "resolve"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Dashboard Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/support/stats",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "support",
+                    "stats"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All Tickets",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/support/tickets?status=open",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "support",
+                    "tickets"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "open"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Show Ticket Detail",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/support/tickets/3",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "support",
+                    "tickets",
+                    "3"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Daily Jurnal Users",
+          "item": [
+            {
+              "name": "Get All Journals",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/journals?per_page=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journals"
+                  ],
+                  "query": [
+                    {
+                      "key": "per_page",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create / Update Today's Journal",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"date\": \"2026-08-03\",\r\n    \"reflection\": \"Hari ini saya fokus mengerjakan integrasi backend.\",\r\n    \"mood\": \"Produktif\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/journals",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journals"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Specific Journal Detail",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/journals/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journals",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Specific Journal",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"mood\": \"Sangat Lelah tapi Puas\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/journals/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journals",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Journal",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/journals/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journals",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage Dokumen",
+          "item": [
+            {
+              "name": "Ambil Semua Dokumen (GET)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/vault",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Unggah Dokumen Baru (POST)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": ""
+                    },
+                    {
+                      "key": "file_type",
+                      "value": "loa",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vault",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Lihat / Unduh Dokumen (GET)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/vault/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Hapus Dokumen (DELETE)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/vault/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "AI Generator Timeline",
+          "item": [
+            {
+              "name": "Generate Timeline (Switch Beasiswa Kapan Saja)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"scholarship_id\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/milestones/generate",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "milestones",
+                    "generate"
+                  ]
+                },
+                "description": "User dapat berganti target beasiswa kapan saja. Jika ganti beasiswa, milestone beasiswa sebelumnya dihapus dan digantikan dengan timeline AI beasiswa yang baru."
+              },
+              "response": []
+            },
+            {
+              "name": "Selesaikan Task",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/milestones/2/complete",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "milestones",
+                    "2",
+                    "complete"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User Milestones",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/milestones?scholarship_id=1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "milestones"
+                  ],
+                  "query": [
+                    {
+                      "key": "scholarship_id",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Submit Jawaban Task (Text & Upload Dokumen -> Vault)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "text_response",
+                      "value": "Saya telah mendokumentasikan 3 pengalaman kepemimpinan di kampus beserta pencapaian jumlah anggota yang dipimpin.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "",
+                      "description": "Dokumen pendukung (PDF, DOCX, JPG). Otomatis masuk ke Document Vault!"
+                    },
+                    {
+                      "key": "file_type",
+                      "value": "essay",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/milestones/1/submit",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "milestones",
+                    "1",
+                    "submit"
+                  ]
+                },
+                "description": "Mentee menjawab task milestone menggunakan teks, berkas dokumen (otomatis masuk ke Brankas/Document Vault), atau keduanya."
+              },
+              "response": []
+            },
+            {
+              "name": "Lihat Status Submission & Feedback Mentor",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/milestones/1/submission",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "milestones",
+                    "1",
+                    "submission"
+                  ]
+                },
+                "description": "Mentee melihat status hasil pengiriman tugas, dokumen tersimpan di vault, dan catatan feedback/revisi dari mentor."
+              },
+              "response": []
+            },
+            {
+              "name": "Cek Daftar Action Plan Mentor Berdasarkan Parent Milestone",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/action-plans/parent/3",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "action-plans",
+                    "parent",
+                    "3"
+                  ]
+                },
+                "description": "Mengambil daftar seluruh tugas Action Plan yang diberikan oleh mentor di bawah cabang/parent milestone tertentu (termasuk status penyelesaian & catatan mentor)."
+              },
+              "response": []
+            },
+            {
+              "name": "Tandai Action Plan Mentor Selesai (Complete Action Plan)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/action-plans/1/complete",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "action-plans",
+                    "1",
+                    "complete"
+                  ]
+                },
+                "description": "Menandai tugas Action Plan buatan mentor sebagai selesai (is_completed: true), otomatis menyelesaikan task di user_milestones, menambah XP mentee, dan memperbarui readiness score."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Assesment 2 (Deep Diagnostic)",
+          "item": [
+            {
+              "name": "Untuk mengambil soal Assessment 2",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/deep-diagnostic/questions",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "deep-diagnostic",
+                    "questions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Untuk mengirim jawaban",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"assessment_type\": \"assessment_2\",\r\n  \"answers\": [\r\n    { \"question_id\": 21, \"option_id\": 90 },\r\n    { \"question_id\": 22, \"option_id\": 96 },\r\n    { \"question_id\": 23, \"option_id\": 104 },\r\n    { \"question_id\": 24, \"text_value\": \"Belum ada pencapaian akademik yang bisa saya jelaskan saat ini.\" },\r\n    { \"question_id\": 25, \"option_id\": 108 },\r\n    { \"question_id\": 26, \"text_value\": \"Belum pernah memegang tanggung jawab besar.\" },\r\n    { \"question_id\": 28, \"option_id\": 121 },\r\n    { \"question_id\": 29, \"option_id\": 127 },\r\n    { \"question_id\": 30, \"text_value\": \"Masih belum tahu ingin berkontribusi di bidang apa.\" },\r\n    { \"question_id\": 31, \"option_id\": 129 }\r\n  ]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/deep-diagnostic/submit",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "deep-diagnostic",
+                    "submit"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Untuk melihat hasil revisi persentase & saran AI + Rekomendasi Beasiswa",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/deep-diagnostic/my-result",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "deep-diagnostic",
+                    "my-result"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Setuju atau Tolak Rekomendasi Beasiswa Matcher AI",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"accept\": true,\r\n    \"scholarship_id\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/deep-diagnostic/choose-recommendation",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "deep-diagnostic",
+                    "choose-recommendation"
+                  ]
+                },
+                "description": "User menyetujui (accept: true) atau menolak (accept: false) rekomendasi beasiswa dari AI pasca-Assessment 2. Jika disetujui, beasiswa disimpan ke tabel user_scholarships dan dijadikan target utama di profil user."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Book Mentor",
+          "item": [
+            {
+              "name": "Booking Mentor",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"availability_id\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/mentor/book",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "mentor",
+                    "book"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Riwayat Booking Saya",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/my-bookings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "my-bookings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Ambil Pop-Up Notifikasi Reschedule (Mentee Dashboard)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/my-bookings/reschedule-popups",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "my-bookings",
+                    "reschedule-popups"
+                  ]
+                },
+                "description": "Mengambil notifikasi modal pop-up jadwal konsultasi yang telah di-reschedule oleh mentor untuk mentee di dashboard."
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Acknowledge Pop-Up Reschedule (Tutup Modal Pop-Up)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/my-bookings/1/acknowledge-reschedule",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "my-bookings",
+                    "1",
+                    "acknowledge-reschedule"
+                  ]
+                },
+                "description": "Mentee mengonfirmasi / menutup modal pop-up notifikasi reschedule agar tidak muncul kembali di dashboard."
+              },
+              "response": []
+            },
+            {
+              "name": "Memberikan Ulasan ke Mentor",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"rating\": 5,\r\n    \"feedback\": \"Sangat membantu!\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/my-bookings/1/review",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "my-bookings",
+                    "1",
+                    "review"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Ticketing Pengaduan User",
+          "item": [
+            {
+              "name": "User Submit Ticket",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"category\": \"payment_issue\",\r\n    \"subject\": \"Pembayaran Midtrans Nyangkut\",\r\n    \"message\": \"Halo min, saya sudah bayar langganan premium...\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/support/submit",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "support",
+                    "submit"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get My Tickets",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/support/my-tickets",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "support",
+                    "my-tickets"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Chatbot Mentor AI (Berbasis Gemini & Full User Context)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"message\": \"Halo mentor, berdasarkan IPK, target beasiswa, dan dokumen di vault saya, kira-kira apa yang harus saya persiapkan minggu ini?\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai-mentor/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ai-mentor",
+                "chat"
+              ]
+            },
+            "description": "Chatbot Mentor AI berbasis Google Gemini API. Menginjeksi konteks lengkap mentee secara otomatis (Profil, IPK, Target Beasiswa, Readiness Score, XP, Status Dokumen Vault, dan Progres Milestone) agar memberikan saran yang sangat personal dan taktis."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mentor",
+      "item": [
+        {
+          "name": "Get All Mentees (Multi-Mentee Dashboard)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/mentees",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "mentees"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Pre-Session Dossier & Pre-Read",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/dossier/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "dossier",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Mentor Availabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/availabilities",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "availabilities"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Store Mentor Availability (Calendar Management - Single / Bulk Batch)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"availabilities\": [\r\n        {\r\n            \"available_date\": \"2026-08-20\",\r\n            \"start_time\": \"09:00\",\r\n            \"end_time\": \"10:00\"\r\n        },\r\n        {\r\n            \"available_date\": \"2026-08-20\",\r\n            \"start_time\": \"13:00\",\r\n            \"end_time\": \"14:00\"\r\n        },\r\n        {\r\n            \"available_date\": \"2026-08-21\",\r\n            \"start_time\": \"15:00\",\r\n            \"end_time\": \"16:00\"\r\n        }\r\n    ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/availabilities",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "availabilities"
+              ]
+            },
+            "description": "Mentor menambahkan satu atau banyak (bulk batch) slot waktu luang sekaligus di kalender mentor portal."
+          },
+          "response": []
+        },
+        {
+          "name": "Store Custom Action Plan (Bulk & Branching Task Post-Session)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"parent_milestone_id\": 3,\r\n    \"action_plans\": [\r\n        {\r\n            \"task_title\": \"Revisi Paragraf Kontribusi Esai\",\r\n            \"task_description\": \"Perjelas dampak nyata dari proyek kepemimpinan yang telah Anda pimpin.\",\r\n            \"mentor_note\": \"Fokus pada kuantifikasi data seperti jumlah peserta dan dampak sosialnya.\",\r\n            \"deadline\": \"2026-08-20\"\r\n        },\r\n        {\r\n            \"task_title\": \"Minta 2 Surat Rekomendasi Resmi\",\r\n            \"task_description\": \"Hubungi dosen pembimbing skripsi dan atasan kerja langsung.\",\r\n            \"mentor_note\": \"Gunakan draf draf rekomendasi yang sudah disepakati saat sesi.\",\r\n            \"deadline\": \"2026-08-25\"\r\n        }\r\n    ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/1/action-plans",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "1",
+                "action-plans"
+              ]
+            },
+            "description": "Mentor memberikan satu atau banyak (bulk) Action Plan / tugas tambahan ke mentee pasca-sesi 1-on-1. Menyertakan task_title, task_description, mentor_note, deadline, dan parent_milestone_id (cabang milestone)."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Consultation Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"meeting_link\": \"https://meet.google.com/abc-defg-hij\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/1/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "1",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Consultation Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"reason\": \"Agenda mendadak yang tidak dapat ditinggalkan.\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/3/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "3",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule Consultation Booking (Mentor - Instan Slot / Pilih Slot)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"available_date\": \"2026-08-22\",\r\n    \"start_time\": \"14:00\",\r\n    \"end_time\": \"15:00\",\r\n    \"reason\": \"Ada keperluan akademik mendesak pada jadwal lama.\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/1/reschedule",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "1",
+                "reschedule"
+              ]
+            },
+            "description": "Mentor meng-reschedule sesi konsultasi mentee secara instan dengan memasukkan tanggal & jam baru (atau new_availability_id). Otomatis memicu indikator & notifikasi pop-up modal di dashboard mentee."
+          },
+          "response": []
+        },
+        {
+          "name": "Mentor Menyelesaikan Sesi (Upload Bukti Sesi & Trigger Saldo)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "session_proof",
+                  "type": "file",
+                  "src": "",
+                  "description": "Foto/Screenshot Bukti Sesi Konsultasi (Max 5MB, format JPG/JPEG/PNG)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/1/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "1",
+                "complete"
+              ]
+            },
+            "description": "Mentor mengunggah berkas foto bukti pelaksanaan sesi (max 5MB, JPG/PNG). Setelah diunggah, status sesi menjadi completed dan fee masuk ke dompet (menunggu review admin jika perlu)."
+          },
+          "response": []
+        },
+        {
+          "name": "Mentor Lihat Daftar Pengiriman Tugas Mentee (Submission Queue)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/submissions?review_status=pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "review_status",
+                  "value": "pending",
+                  "description": "Pilihan: pending, approved, revision_requested"
+                }
+              ]
+            },
+            "description": "Mentor memeriksa jawaban teks & dokumen yang diunggah oleh mentee."
+          },
+          "response": []
+        },
+        {
+          "name": "Mentor Menilai & Beri Feedback (Approve / Revisi + Rewards XP)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"status\": \"approved\",\r\n    \"feedback\": \"Refleksi kepemimpinan sangat terstruktur dan bukti dokumen lengkap! Selamat!\",\r\n    \"rating\": 5\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/submissions/1/review",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "submissions",
+                "1",
+                "review"
+              ]
+            },
+            "description": "Mentor menilai jawaban/tugas mentee. Jika status 'approved', mentee dapat XP reward, task selesai, dan feedback tersimpan. Jika status 'revision_requested', mentee menerima catatan revisi dan status task menjadi in_progress kembali."
+          },
+          "response": []
+        },
+        {
+          "name": "Memberikan Evaluasi ke Mentee",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"rating\": 4,\r\n    \"feedback\": \"Budi sudah memiliki draft esai yang kuat secara konten.\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mentor/bookings/1/review",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "bookings",
+                "1",
+                "review"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Menampilkan Statistik Dashboard Mentor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/dashboard/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "dashboard",
+                "stats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Menampilkan Riwayat Pendapatan / Invoice Mentor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mentor/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "mentor",
+                "invoices"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Menu Umum",
+      "item": [
+        {
+          "name": "Get All Universities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/universities",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "universities"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search University",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/universities?search=Tech&country=Indonesia",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "universities"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Tech"
+                },
+                {
+                  "key": "country",
+                  "value": "Indonesia"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Detail University",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/universities/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "universities",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Semua Beasiswa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/scholarships?search=LPDP&funding_type=fully_funded",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "scholarships"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "LPDP"
+                },
+                {
+                  "key": "funding_type",
+                  "value": "fully_funded"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Detail Beasiswa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/scholarships/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "scholarships",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Initial Assesments",
+      "item": [
+        {
+          "name": "Mengambil Daftar Soal Asesmen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/diagnostic/questions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "diagnostic",
+                "questions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Jawaban Asesmen",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"assessment_type\": \"initial_diagnostic\",\r\n  \"guest_token\": \"token-unik-worstcase-initial-001\",\r\n  \"answers\": [\r\n    { \"question_id\": 1, \"option_id\": 5 },\r\n    { \"question_id\": 2, \"option_id\": 10 }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/diagnostic/submit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "diagnostic",
+                "submit"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Melihat Hasil Asesmen Sendiri (My Result)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/diagnostic/my-result?guest_token=token-unik-bebas-dari-frontend-12345",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "diagnostic",
+                "my-result"
+              ],
+              "query": [
+                {
+                  "key": "guest_token",
+                  "value": "token-unik-bebas-dari-frontend-12345"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "auth",
+      "secret": true
+    }
+  ]
+}

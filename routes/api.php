@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/questions', [UserDeepDiagnosticController::class, 'getQuestions']);
         Route::post('/submit', [UserDeepDiagnosticController::class, 'submitAssessment']);
         Route::get('/my-result', [UserDeepDiagnosticController::class, 'getMyAssessment']); 
+        Route::post('/choose-recommendation', [UserDeepDiagnosticController::class, 'chooseRecommendation']);
     });
     
     // Endpoint Khusus Setup/Update Profil Akademik & Target (Task 1.5 Milestone 2)
@@ -150,6 +151,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); 
         Route::patch('/{id}/complete', [MilestoneController::class, 'completeTask']);   
         Route::patch('/{id}/discover', [MilestoneController::class, 'markAsDiscovered']); 
+        Route::post('/{id}/submit', [MilestoneController::class, 'submitTask']);
+        Route::get('/{id}/submission', [MilestoneController::class, 'getTaskSubmission']);
+        Route::get('/{parentMilestoneId}/action-plans', [MentorPortalController::class, 'getActionPlansByParent']);
+    });
+
+    // Action Plans Management
+    Route::prefix('action-plans')->group(function () {
+        Route::match(['patch', 'post'], '/{id}/complete', [MentorPortalController::class, 'completeActionPlan']);
+        Route::get('/parent/{parentMilestoneId}', [MentorPortalController::class, 'getActionPlansByParent']);
     });
 
     // Shop & Monetization (Premium & Tokens)
@@ -184,6 +194,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mentor/availability', [MentorBookingController::class, 'getMentorAvailability']);
     Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
     Route::get('/my-bookings', [MentorBookingController::class, 'getMyBookings']);
+    Route::get('/my-bookings/reschedule-popups', [MentorBookingController::class, 'getReschedulePopups']);
+    Route::patch('/my-bookings/{bookingId}/acknowledge-reschedule', [MentorBookingController::class, 'acknowledgeReschedule']);
     
     // [BARU] Mentee memberikan review ke Mentor
     Route::post('/my-bookings/{bookingId}/review', [MentorBookingController::class, 'submitReview']);
@@ -196,8 +208,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard/stats', [MentorPortalController::class, 'getDashboardStats']);
         Route::get('/invoices', [MentorPortalController::class, 'getEarningInvoices']);
         
-        // Manual Complete Session & Cairkan Dana
-        Route::patch('/bookings/{bookingId}/complete', [MentorPortalController::class, 'completeBooking']);
+        // Manual Complete Session (Wajib Upload Bukti Sesi) & Cairkan Dana
+        Route::match(['patch', 'post'], '/bookings/{bookingId}/complete', [MentorPortalController::class, 'completeBooking']);
 
         // Multi-Mentee Dashboard
         Route::get('/mentees', [MentorPortalController::class, 'getMenteeList']);
@@ -220,6 +232,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Custom Action Plan Generation (Pasca-Konsultasi)
         Route::post('/bookings/{bookingId}/action-plans', [MentorPortalController::class, 'storeActionPlan']);
 
+        // Audit & Review Tugas / Submission Mentee (Approve / Revisi)
+        Route::get('/submissions', [MentorPortalController::class, 'getMenteeSubmissions']);
+        Route::post('/submissions/{submissionId}/review', [MentorPortalController::class, 'reviewSubmission']);
+
         // Mentor Document Sharing
         Route::get('/documents', [MentorDocumentController::class, 'index']);
         Route::post('/documents', [MentorDocumentController::class, 'store']);
@@ -238,6 +254,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/mentors', [AdminFinanceController::class, 'getMentorFinances']);
             Route::patch('/mentors/{id}/rate', [AdminFinanceController::class, 'updateMentorRate']);
             Route::post('/mentors/{id}/payout', [AdminFinanceController::class, 'processPayout']);
+            Route::get('/consultations', [AdminFinanceController::class, 'getConsultationProofs']);
+            Route::patch('/consultations/{bookingId}/verify-proof', [AdminFinanceController::class, 'verifyConsultationProof']);
         });
 
         // User Management

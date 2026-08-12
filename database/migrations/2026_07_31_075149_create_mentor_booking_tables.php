@@ -114,6 +114,15 @@ return new class extends Migration
             
             $table->enum('session_status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
             $table->string('meeting_link')->nullable(); 
+            $table->string('session_proof')->nullable()->comment('Path file foto bukti pelaksanaan sesi konsultasi');
+            $table->enum('proof_status', ['pending', 'approved', 'rejected'])->default('pending')->comment('Status verifikasi bukti sesi oleh admin');
+            $table->text('proof_review_notes')->nullable()->comment('Catatan peninjauan bukti sesi dari admin');
+            
+            // Reschedule Indicator & Notification Tracking
+            $table->boolean('is_rescheduled')->default(false)->comment('Apakah sesi ini pernah di-reschedule');
+            $table->enum('rescheduled_by', ['mentor', 'mentee'])->nullable()->comment('Siapa yang mengajukan reschedule');
+            $table->text('reschedule_reason')->nullable()->comment('Alasan reschedule jadwal');
+            $table->boolean('reschedule_acknowledged')->default(false)->comment('Status mentee sudah menutup pop-up notifikasi reschedule');
             $table->timestamps();
         });
 
@@ -121,7 +130,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('booking_id')->constrained('consultation_bookings')->cascadeOnDelete();
             $table->foreignId('mentee_id')->constrained('users')->cascadeOnDelete();
-            $table->string('task_description');
+            $table->string('task_title');
+            $table->text('task_description')->nullable();
+            $table->text('mentor_note')->nullable();
             $table->date('deadline')->nullable();
             $table->boolean('is_completed')->default(false);
             $table->timestamps();

@@ -183,7 +183,8 @@ class AuthController extends Controller
                 'is_premium' => false, 
                 'status' => $isFirstMilestoneCompleted ? 'completed' : 'pending',
                 'completed_at' => $isFirstMilestoneCompleted ? now() : null,
-                'target_deadline' => Carbon::now()->addDays(2),
+                'start_date' => Carbon::now(),
+                'target_date' => Carbon::now()->addDays(2),
                 'source' => 'system',
                 'is_mandatory' => true,
                 'is_discovered' => true, // <-- SET TO TRUE
@@ -198,26 +199,12 @@ class AuthController extends Controller
                 'step_order' => 2,
                 'is_premium' => false,
                 'status' => 'pending',
-                'target_deadline' => Carbon::now()->addDays(5),
+                'start_date' => Carbon::now()->addDays(2),
+                'target_date' => Carbon::now()->addDays(5),
                 'source' => 'system',
                 'is_mandatory' => true,
                 'is_discovered' => false, // <-- SET TO FALSE
                 'xp_reward' => 100
-            ]);
-
-            // Fase 3: is_discovered diset false agar user harus tap/reveal
-            UserMilestone::create([
-                'user_id' => $user->id,
-                'task_name' => 'Fase 3: Reveal Your Mentor',
-                'description' => 'Unlock and meet your dedicated AI/human mentor to guide your personalized scholarship journey.',
-                'step_order' => 3,
-                'is_premium' => true,
-                'status' => 'pending',
-                'target_deadline' => Carbon::now()->addDays(7),
-                'source' => 'system',
-                'is_mandatory' => true,
-                'is_discovered' => false, // <-- SET TO FALSE
-                'xp_reward' => 150
             ]);
 
             // 4. BERIKAN REWARD XP JIKA BAWA GUEST TOKEN

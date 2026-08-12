@@ -180,7 +180,7 @@ class MentorBookingController extends Controller
     }
 
     /**
-     * 2. MENTEE MELIHAT DAFTAR BOOKING MEREKA SENDIRI
+     * 2. MENTEE MELIHAT DAFTAR BOOKING MEREKA SENDIRI + INDIKATOR POP-UP RESCHEDULE
      */
     public function getMyBookings(Request $request)
     {
@@ -195,18 +195,95 @@ class MentorBookingController extends Controller
         ->orderBy('created_at', 'desc') 
         ->get();
 
-        if ($bookings->isEmpty()) {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Anda belum memiliki riwayat booking konsultasi.',
-                'data' => []
-            ], 200);
-        }
+        // Cari booking yang di-reschedule dan belum di-acknowledge (untuk pemicu Pop-Up di Dashboard Mentee)
+        $unacknowledgedReschedules = $bookings->filter(function ($b) {
+            return $b->is_rescheduled && !$b->reschedule_acknowledged;
+        })->map(function ($b) {
+            return [
+                'booking_id'        => $b->id,
+                'mentor_name'       => $b->mentor->name ?? 'Mentor',
+                'rescheduled_by'    => $b->rescheduled_by,
+                'reschedule_reason' => $b->reschedule_reason ?? 'Penyesuaian jadwal dari mentor.',
+                'new_schedule'      => [
+                    'date'       => $b->availability->available_date ?? null,
+                    'start_time' => $b->availability->start_time ?? null,
+                    'end_time'   => $b->availability->end_time ?? null,
+                ]
+            ];
+        })->values();
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Berhasil mengambil data riwayat booking.',
-            'data' => $bookings
+            'status'                         => 'success',
+            'message'                        => 'Berhasil mengambil data riwayat booking.',
+            'has_reschedule_notifications'   => $unacknowledgedReschedules->isNotEmpty(),
+            'reschedule_popups'              => $unacknowledgedReschedules,
+            'data'                           => $bookings
+        ], 200);
+    }
+
+    /**
+     * [BARU] 2B. CUKUP AMBIL DASHBOARD POP-UP NOTIFICATION UNTUK MENTEE
+     */
+    public function getReschedulePopups(Request $request)
+    {
+        $user = Auth::user();
+
+        $popups = ConsultationBooking::with([
+            'mentor:id,name,email,profile_picture_url',
+            'availability:id,available_date,start_time,end_time'
+        ])
+        ->where('mentee_id', $user->id)
+        ->where('is_rescheduled', true)
+        ->where('reschedule_acknowledged', false)
+        ->get()
+        ->map(function ($b) {
+            return [
+                'booking_id'        => $b->id,
+                'mentor_name'       => $b->mentor->name ?? 'Mentor',
+                'rescheduled_by'    => $b->rescheduled_by,
+                'reschedule_reason' => $b->reschedule_reason ?? 'Penyesuaian jadwal dari mentor.',
+                'meeting_link'      => $b->meeting_link,
+                'new_schedule'      => [
+                    'date'       => $b->availability->available_date ?? null,
+                    'start_time' => $b->availability->start_time ?? null,
+                    'end_time'   => $b->availability->end_time ?? null,
+                ]
+            ];
+        });
+
+        return response()->json([
+            'status'     => 'success',
+            'show_popup' => $popups->isNotEmpty(),
+            'popups'     => $popups
+        ], 200);
+    }
+
+    /**
+     * [BARU] 2C. MENTEE MENUTUP / MENGAKUI POP-UP RESCHEDULE
+     */
+    public function acknowledgeReschedule(Request $request, $bookingId)
+    {
+        $user = Auth::user();
+
+        $booking = ConsultationBooking::where('id', $bookingId)
+            ->where('mentee_id', $user->id)
+            ->first();
+
+        if (!$booking) {
+            return response()->json(['status' => 'error', 'message' => 'Booking tidak ditemukan.'], 404);
+        }
+
+        $booking->update([
+            'reschedule_acknowledged' => true
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Notifikasi pop-up reschedule telah di-acknowledge.',
+            'data'    => [
+                'booking_id'              => $booking->id,
+                'reschedule_acknowledged' => true
+            ]
         ], 200);
     }
 

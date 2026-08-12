@@ -12,7 +12,9 @@ class ActionPlan extends Model
     protected $fillable = [
         'booking_id',
         'mentee_id',
+        'task_title',
         'task_description',
+        'mentor_note',
         'deadline',
         'is_completed',
     ];

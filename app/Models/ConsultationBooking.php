@@ -14,17 +14,26 @@ class ConsultationBooking extends Model
         'mentor_id',
         'availability_id',
         'token_cost', 
-        'mentor_earned_fee', // <-- DITAMBAHKAN SESUAI MIGRATION
+        'mentor_earned_fee',
         'session_status',
         'meeting_link',
-        'user_milestone_id'
+        'session_proof',
+        'proof_status',
+        'proof_review_notes',
+        'user_milestone_id',
+        'is_rescheduled',
+        'rescheduled_by',
+        'reschedule_reason',
+        'reschedule_acknowledged'
     ];
 
     protected function casts(): array
     {
         return [
-            'token_cost' => 'integer',
-            'mentor_earned_fee' => 'decimal:2', // <-- DITAMBAHKAN FORMAT DESIMAL
+            'token_cost'              => 'integer',
+            'mentor_earned_fee'       => 'decimal:2',
+            'is_rescheduled'          => 'boolean',
+            'reschedule_acknowledged' => 'boolean',
         ];
     }
 
