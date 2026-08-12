@@ -26,6 +26,7 @@ use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\UserDeepDiagnosticController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\AdminFinanceController; // <-- IMPORT BARU
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -45,7 +46,7 @@ Route::middleware('throttle:60,1')->group(function () {
     // ==========================================
     // RUTE PROXY REDIRECT MIDTRANS -> FRONTEND
     // ==========================================
-    Route::get('/payment/return', [PaymentController::class, 'paymentReturn']); // <-- RUTE BARU DITAMBAHKAN DI SINI
+    Route::get('/payment/return', [PaymentController::class, 'paymentReturn']); 
 
     // Diagnostic Assessment (Public Hook - Bisa diakses Guest maupun Logged In)
     Route::prefix('diagnostic')->group(function () {
@@ -191,6 +192,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // MENTOR MODULE (SISI MENTOR ONLY)
     // ==========================================
     Route::middleware('role:mentor')->prefix('mentor')->group(function () {
+        // Dashboard & Finansial Mentor
+        Route::get('/dashboard/stats', [MentorPortalController::class, 'getDashboardStats']);
+        Route::get('/invoices', [MentorPortalController::class, 'getEarningInvoices']);
+        
+        // Manual Complete Session & Cairkan Dana
+        Route::patch('/bookings/{bookingId}/complete', [MentorPortalController::class, 'completeBooking']);
+
         // Multi-Mentee Dashboard
         Route::get('/mentees', [MentorPortalController::class, 'getMenteeList']);
         
@@ -206,7 +214,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/bookings/{bookingId}/reject', [MentorPortalController::class, 'rejectBooking']);
         Route::patch('/bookings/{bookingId}/reschedule', [MentorPortalController::class, 'rescheduleBooking']);
 
-        // [BARU] Mentor memberikan review/catatan evaluasi ke Mentee
+        // Mentor memberikan review/catatan evaluasi ke Mentee
         Route::post('/bookings/{bookingId}/review', [MentorPortalController::class, 'submitMenteeReview']);
 
         // Custom Action Plan Generation (Pasca-Konsultasi)
@@ -223,6 +231,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'getDashboardStats']);
         
+        // ==========================================
+        // [BARU] MANAJEMEN KEUANGAN MENTOR (ADMIN SIDE)
+        // ==========================================
+        Route::prefix('finances')->group(function () {
+            Route::get('/mentors', [AdminFinanceController::class, 'getMentorFinances']);
+            Route::patch('/mentors/{id}/rate', [AdminFinanceController::class, 'updateMentorRate']);
+            Route::post('/mentors/{id}/payout', [AdminFinanceController::class, 'processPayout']);
+        });
+
         // User Management
         Route::get('/get-users', [AdminController::class, 'index']); 
         Route::get('/get-user-detail/{id}', [AdminController::class, 'show']); 

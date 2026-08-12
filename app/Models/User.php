@@ -40,7 +40,16 @@ use Laravel\Sanctum\HasApiTokens;
     'gpa', 
     'undergraduate_major', 
     'target_major', 
-    'primary_scholarship_target'
+    'primary_scholarship_target',
+
+    // ==========================================
+    // Atribut Gaji, Saldo & Rekening Mentor
+    // ==========================================
+    'session_rate',
+    'earning_balance',
+    'bank_name',
+    'bank_account_number',
+    'bank_account_name'
 ])]
 #[Hidden([
     'password', 
@@ -77,6 +86,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'longest_streak' => 'integer',
             'is_premium' => 'boolean',
             'gpa' => 'decimal:2', // Format angka desimal untuk IPK
+            'session_rate' => 'decimal:2',
+            'earning_balance' => 'decimal:2',
         ];
     }
 
@@ -245,6 +256,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(DailyDrill::class, 'user_id');
     }
+    
     /**
      * Relasi ke profil mentor (Hanya berisi data jika role = 'mentor')
      */
@@ -253,6 +265,7 @@ class User extends Authenticatable implements MustVerifyEmail
         // Pastikan nama relasinya sama persis: mentorProfile
         return $this->hasOne(MentorProfile::class, 'user_id', 'id');
     }
+    
     /**
      * Review yang DIBERIKAN oleh user ini.
      */

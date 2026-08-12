@@ -20,6 +20,15 @@ return new class extends Migration
             // Atribut Khusus Sistem Beasiswa
             $table->enum('role', ['user', 'mentor', 'admin'])->default('user');
             
+            // ==========================================
+            // [BARU] PENGATURAN GAJI, SALDO, & REKENING MENTOR
+            // ==========================================
+            $table->decimal('session_rate', 12, 2)->default(0)->comment('Gaji per sesi yang diatur Admin untuk Mentor');
+            $table->decimal('earning_balance', 12, 2)->default(0)->comment('Saldo dompet penghasilan Mentor');
+            $table->string('bank_name')->nullable()->comment('Nama Bank untuk pencairan (ex: BCA, BNI, Mandiri)');
+            $table->string('bank_account_number')->nullable()->comment('Nomor Rekening Mentor');
+            $table->string('bank_account_name')->nullable()->comment('Nama Pemilik Rekening Asli');
+            
             $table->foreignId('assigned_mentor_id')
                   ->nullable()
                   ->constrained('users')

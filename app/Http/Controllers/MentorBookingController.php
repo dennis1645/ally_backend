@@ -16,7 +16,7 @@ use App\Models\MentorProfile;
 class MentorBookingController extends Controller
 {
     /**
-     * [BARU] 0. MENTEE MELIHAT JADWAL KETERSEDIAAN MENTOR
+     * 0. MENTEE MELIHAT JADWAL KETERSEDIAAN MENTOR
      */
     public function getMentorAvailability(Request $request)
     {
@@ -119,11 +119,18 @@ class MentorBookingController extends Controller
                 ], 400);
             }
 
+            $mentor = $availability->mentor;
+
+            // =========================================================
+            // PERBAIKAN: Menyimpan 'mentor_earned_fee' saat booking
+            // Gaji dikunci dari data 'session_rate' mentor saat ini.
+            // =========================================================
             $booking = ConsultationBooking::create([
                 'mentee_id' => $mentee->id,
-                'mentor_id' => $availability->mentor_id,
+                'mentor_id' => $mentor->id,
                 'availability_id' => $availability->id,
                 'token_cost' => 1, 
+                'mentor_earned_fee' => $mentor->session_rate ?? 0, // <-- MENGUNCI GAJI MENTOR
                 'session_status' => 'pending',
                 'meeting_link' => null, 
             ]);
@@ -133,7 +140,6 @@ class MentorBookingController extends Controller
 
             DB::commit();
 
-            $mentor = $availability->mentor;
             try {
                 Mail::send('emails.mentor_booking_notification', [
                     'mentorName' => $mentor->name,

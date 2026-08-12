@@ -13,10 +13,111 @@ use App\Models\MentorAvailability;
 use App\Models\ConsultationBooking;
 use App\Models\ActionPlan;
 use App\Models\UserMilestone;
-use App\Models\SessionReview; // <-- IMPORT MODEL REVIEW
+use App\Models\SessionReview; 
 
 class MentorPortalController extends Controller
 {
+    // =========================================================================
+    // [BARU] 0. DASHBOARD MENTOR (Statistik & Saldo Pendapatan)
+    // =========================================================================
+    public function getDashboardStats(Request $request)
+    {
+        $mentor = Auth::user();
+
+        if ($mentor->role !== 'mentor') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        // 1. Total Mentee Unik yang ditangani
+        $totalMentees = ConsultationBooking::where('mentor_id', $mentor->id)
+            ->distinct('mentee_id')
+            ->count('mentee_id');
+
+        // 2. Total Sesi Selesai
+        $completedSessions = ConsultationBooking::where('mentor_id', $mentor->id)
+            ->where('session_status', 'completed')
+            ->count();
+
+        // 3. Total Sesi Menunggu (Confirmed)
+        $upcomingSessionsCount = ConsultationBooking::where('mentor_id', $mentor->id)
+            ->where('session_status', 'confirmed')
+            ->count();
+
+        // 4. Saldo Pendapatan Terkini (Dompet Mentor)
+        $earningBalance = $mentor->earning_balance;
+
+        // 5. 5 Jadwal Terdekat
+        $upcomingBookings = ConsultationBooking::with(['mentee:id,name,email,profile_picture_url', 'availability'])
+            ->where('mentor_id', $mentor->id)
+            ->where('session_status', 'confirmed')
+            ->whereHas('availability', function($q) {
+                $q->where('available_date', '>=', now()->toDateString());
+            })
+            // Sorting berdasarkan relasi tanggal dari tabel availability
+            ->join('mentor_availabilities', 'consultation_bookings.availability_id', '=', 'mentor_availabilities.id')
+            ->orderBy('mentor_availabilities.available_date', 'asc')
+            ->orderBy('mentor_availabilities.start_time', 'asc')
+            ->select('consultation_bookings.*') // Hindari collision kolom ID
+            ->take(5)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data dashboard mentor berhasil dimuat.',
+            'data' => [
+                'statistics' => [
+                    'total_mentees' => $totalMentees,
+                    'completed_sessions' => $completedSessions,
+                    'upcoming_sessions' => $upcomingSessionsCount,
+                    'earning_balance' => (float) $earningBalance,
+                ],
+                'upcoming_schedules' => $upcomingBookings
+            ]
+        ], 200);
+    }
+
+    // =========================================================================
+    // [BARU] 0.5. RIWAYAT INVOICE & PENDAPATAN MENTOR
+    // =========================================================================
+    public function getEarningInvoices(Request $request)
+    {
+        $mentor = Auth::user();
+
+        if ($mentor->role !== 'mentor') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        // Ambil histori sesi yang sudah selesai dan menghasilkan uang
+        $invoices = ConsultationBooking::with(['mentee:id,name', 'availability'])
+            ->where('mentor_id', $mentor->id)
+            ->where('session_status', 'completed')
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    // Generate Nomor Invoice Unik
+                    'invoice_id' => 'INV-MNT-' . date('Ym', strtotime($booking->updated_at)) . '-' . str_pad($booking->id, 5, '0', STR_PAD_LEFT),
+                    'booking_id' => $booking->id,
+                    'mentee_name' => $booking->mentee->name,
+                    'consultation_date' => $booking->availability->available_date ?? null,
+                    'time_slot' => ($booking->availability->start_time ?? '') . ' - ' . ($booking->availability->end_time ?? ''),
+                    'earned_fee' => (float) $booking->mentor_earned_fee,
+                    'payment_status' => 'Paid (Added to Balance)',
+                    'completed_at' => $booking->updated_at->format('Y-m-d H:i:s')
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Berhasil memuat daftar invoice pendapatan.',
+            'data' => [
+                'current_earning_balance' => (float) $mentor->earning_balance,
+                'total_invoices' => $invoices->count(),
+                'history' => $invoices
+            ]
+        ], 200);
+    }
+
     /**
      * 1. MULTI-MENTEE DASHBOARD
      */
@@ -25,10 +126,7 @@ class MentorPortalController extends Controller
         $mentor = Auth::user();
 
         if ($mentor->role !== 'mentor') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Akses ditolak. Fitur ini khusus untuk Mentor.'
-            ], 403);
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
         $menteeIds = ConsultationBooking::where('mentor_id', $mentor->id)
@@ -76,10 +174,7 @@ class MentorPortalController extends Controller
         $mentor = Auth::user();
 
         if ($mentor->role !== 'mentor') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Akses ditolak. Fitur ini khusus untuk Mentor.'
-            ], 403);
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
         $booking = ConsultationBooking::with([
@@ -94,10 +189,7 @@ class MentorPortalController extends Controller
             ->first();
 
         if (!$booking) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Jadwal konsultasi tidak ditemukan atau bukan hak akses Anda.'
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Jadwal konsultasi tidak ditemukan atau bukan hak akses Anda.'], 404);
         }
 
         $mentee = $booking->mentee;
@@ -110,6 +202,7 @@ class MentorPortalController extends Controller
                 'session_status' => $booking->session_status,
                 'meeting_link' => $booking->meeting_link ?? 'Belum ada link meeting (Belum dikonfirmasi)',
                 'token_cost' => $booking->token_cost,
+                'mentor_earned_fee' => (float) $booking->mentor_earned_fee,
                 'scheduled_at' => [
                     'date' => $booking->availability->available_date ?? null,
                     'start_time' => $booking->availability->start_time ?? null,
@@ -307,13 +400,14 @@ class MentorPortalController extends Controller
                 $booking->availability->delete();
             }
 
+            // Kembalikan token ke mentee
             $booking->mentee->increment('token_balance', 1);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Sesi ditolak dan token dikembalikan.',
+                'message' => 'Sesi ditolak dan token dikembalikan ke mentee.',
                 'data' => $booking
             ], 200);
 
@@ -365,6 +459,58 @@ class MentorPortalController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // =========================================================================
+    // [BARU] 4D. MENTOR MENYELESAIKAN SESI (TRIGGER PEMBAYARAN)
+    // =========================================================================
+    public function completeBooking(Request $request, $bookingId)
+    {
+        $mentor = Auth::user();
+
+        if ($mentor->role !== 'mentor') {
+            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $booking = ConsultationBooking::where('id', $bookingId)->where('mentor_id', $mentor->id)->first();
+
+        if (!$booking) {
+            return response()->json(['status' => 'error', 'message' => 'Booking tidak ditemukan.'], 404);
+        }
+
+        if ($booking->session_status === 'completed') {
+            return response()->json(['status' => 'error', 'message' => 'Sesi ini sudah ditandai selesai sebelumnya.'], 400);
+        }
+
+        if ($booking->session_status !== 'confirmed') {
+            return response()->json(['status' => 'error', 'message' => 'Hanya sesi yang dikonfirmasi yang bisa diselesaikan.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. Ubah status sesi menjadi Selesai
+            $booking->update(['session_status' => 'completed']);
+
+            // 2. Lock & Increment saldo dompet Mentor
+            $lockedMentor = User::where('id', $mentor->id)->lockForUpdate()->first();
+            $lockedMentor->increment('earning_balance', $booking->mentor_earned_fee);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Sesi berhasil diselesaikan! Dana Rp ' . number_format($booking->mentor_earned_fee, 0, ',', '.') . ' telah ditambahkan ke dompet Anda.',
+                'data' => [
+                    'booking_id' => $booking->id,
+                    'earned_fee' => (float) $booking->mentor_earned_fee,
+                    'new_earning_balance' => (float) $lockedMentor->earning_balance
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => 'Gagal menyelesaikan sesi: ' . $e->getMessage()], 500);
         }
     }
 
@@ -434,8 +580,12 @@ class MentorPortalController extends Controller
                 'xp_reward' => 50,
             ]);
 
+            // Jika Action Plan dibuat, dan sesi belum "completed", otomatis selesaikan sesi dan cairkan dana!
             if ($booking->session_status !== 'completed') {
                 $booking->update(['session_status' => 'completed']);
+                
+                $lockedMentor = User::where('id', $mentor->id)->lockForUpdate()->first();
+                $lockedMentor->increment('earning_balance', $booking->mentor_earned_fee);
             }
 
             DB::commit();
@@ -477,7 +627,6 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Booking tidak ditemukan.'], 404);
         }
 
-        // Boleh review asalkan sesi sudah terkonfirmasi atau selesai
         if (!in_array($booking->session_status, ['confirmed', 'completed'])) {
             return response()->json(['status' => 'error', 'message' => 'Hanya sesi yang sudah disetujui atau selesai yang bisa diberikan evaluasi.'], 400);
         }
@@ -493,8 +642,8 @@ class MentorPortalController extends Controller
         try {
             $review = SessionReview::create([
                 'booking_id'  => $booking->id,
-                'reviewer_id' => $mentor->id,      // Mentor yg memberikan
-                'reviewee_id' => $booking->mentee_id, // Mentee yg menerima
+                'reviewer_id' => $mentor->id,      
+                'reviewee_id' => $booking->mentee_id, 
                 'rating'      => $request->rating,
                 'feedback'    => $request->feedback,
             ]);

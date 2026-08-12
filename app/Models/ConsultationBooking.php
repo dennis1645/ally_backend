@@ -13,7 +13,8 @@ class ConsultationBooking extends Model
         'mentee_id',
         'mentor_id',
         'availability_id',
-        'token_cost', // Menggantikan transaction_detail_id
+        'token_cost', 
+        'mentor_earned_fee', // <-- DITAMBAHKAN SESUAI MIGRATION
         'session_status',
         'meeting_link',
         'user_milestone_id'
@@ -23,6 +24,7 @@ class ConsultationBooking extends Model
     {
         return [
             'token_cost' => 'integer',
+            'mentor_earned_fee' => 'decimal:2', // <-- DITAMBAHKAN FORMAT DESIMAL
         ];
     }
 
@@ -45,6 +47,7 @@ class ConsultationBooking extends Model
     {
         return $this->hasMany(ActionPlan::class, 'booking_id');
     }
+    
     public function reviews()
     {
         return $this->hasMany(SessionReview::class, 'booking_id');
