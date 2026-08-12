@@ -99,7 +99,12 @@ return new class extends Migration
             $table->integer('step_order')->default(1); // Urutan milestone (1, 2, 3 gratis)
             $table->boolean('is_premium')->default(false); // Penanda apakah task ini dikunci (butuh bayar)
 
-            $table->date('target_deadline');
+            // ==========================================
+            // [PERBAIKAN] SESUAIKAN DENGAN FORMAT JSON AI
+            // ==========================================
+            $table->date('start_date')->nullable();  // Kapan task harus mulai dikerjakan
+            $table->date('target_date')->nullable(); // Kapan task ditargetkan selesai
+            
             $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->timestamp('completed_at')->nullable(); 
             
@@ -166,7 +171,7 @@ return new class extends Migration
         Schema::dropIfExists('daily_journals');
         Schema::dropIfExists('document_vaults');
         Schema::dropIfExists('user_milestones');
-        Schema::dropIfExists('user_scholarships'); // Tambahkan di down() juga
+        Schema::dropIfExists('user_scholarships'); 
         Schema::dropIfExists('scholarship_university');
         Schema::dropIfExists('scholarships');
         Schema::dropIfExists('universities');

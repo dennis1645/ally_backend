@@ -46,42 +46,39 @@ class MilestoneController extends Controller
 
     public function getTimeline(Request $request)
     {
-        // 1. UBAH VALIDASI MENJADI NULLABLE
         $request->validate([
             'scholarship_id' => 'nullable|exists:scholarships,id',
         ]);
 
         $user = Auth::user();
-        $scholarshipId = $request->scholarship_id; // Bisa null, bisa berisi angka (contoh: 1)
+        $scholarshipId = $request->scholarship_id; 
 
-        // 2. BANGUN QUERY DASAR (Root Milestone)
+        // ====================================================================
+        // PERBAIKAN: Mengubah target_deadline menjadi target_date di orderBy
+        // ====================================================================
         $query = UserMilestone::where('user_id', $user->id)
             ->whereNull('parent_id')
             ->with(['subTasks' => function ($q) {
-                $q->orderBy('target_deadline', 'asc')
+                $q->orderBy('target_date', 'asc') // <-- DIGANTI DI SINI
                   ->with('subTasks'); 
             }])
             ->orderBy('step_order', 'asc')
-            ->orderBy('target_deadline', 'asc');
+            ->orderBy('target_date', 'asc'); // <-- DIGANTI DI SINI
 
-        // 3. LOGIKA PEMISAHAN BERDASARKAN PARAMETER
         if ($scholarshipId) {
-            // Skenario A: User sudah milih beasiswa -> Ambil Fase 1-3 (null) + AI Timeline (scholarship_id)
             $query->where(function ($q) use ($scholarshipId) {
                 $q->where('scholarship_id', $scholarshipId)
                   ->orWhereNull('scholarship_id');
             });
         } else {
-            // Skenario B: User baru daftar & belum pilih beasiswa -> HANYA ambil Fase 1-3 (null)
             $query->whereNull('scholarship_id');
         }
 
         $milestones = $query->get();
 
-        // 4. RESPONSE HANDLING
         if ($milestones->isEmpty()) {
             return response()->json([
-                'status' => 'success', // Diubah jadi success agar frontend tidak bingung me-render state kosong
+                'status' => 'success', 
                 'message' => 'Belum ada timeline yang ditemukan.',
                 'data' => [
                     'is_user_premium' => (bool) $user->is_premium,
@@ -108,9 +105,6 @@ class MilestoneController extends Controller
 
         $user = Auth::user();
         
-        // =====================================================================
-        // LOGIKA BARU: BLOKIR GENERATE JIKA MASIH ADA TIMELINE AKTIF
-        // =====================================================================
         $existingMilestone = UserMilestone::where('user_id', $user->id)
             ->whereNotNull('scholarship_id')
             ->whereNull('parent_id')
@@ -131,7 +125,6 @@ class MilestoneController extends Controller
                 }
             }
         }
-        // =====================================================================
 
         $scholarship = Scholarship::with('universities')->findOrFail($request->scholarship_id);
         $deadline = Carbon::parse($scholarship->deadline_date);
@@ -143,7 +136,6 @@ class MilestoneController extends Controller
             ], 400);
         }
 
-        // --- MENGAMBIL JAWABAN MENTAH USER DARI DATABASE ---
         $assessment = DB::table('diagnostic_assessments')
             ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
@@ -155,7 +147,6 @@ class MilestoneController extends Controller
 
         $readinessScore = $user->readiness_score ?? 0;
         
-        // Payload Sesuai Format AI Engineer
         $payload = [
             'studentId' => "student-readiness-{$readinessScore}-{$user->id}",
             'answers'   => $answersData,
@@ -195,6 +186,17 @@ class MilestoneController extends Controller
 
             $valleys = $journeyData['valleys'];
             
+            // ====================================================================
+            // PERBAIKAN: Menarik Global Start Date & Target Date dari Root Timeline
+            // ====================================================================
+            $globalStartDate = isset($journeyData['timeline']['start_date']) 
+                ? Carbon::parse($journeyData['timeline']['start_date'])->format('Y-m-d') 
+                : now()->format('Y-m-d');
+                
+            $globalTargetDate = isset($journeyData['timeline']['target_date']) 
+                ? Carbon::parse($journeyData['timeline']['target_date'])->format('Y-m-d') 
+                : $deadline->format('Y-m-d');
+
             foreach ($valleys as $vIndex => $valley) {
                 $step_order = $baseStepOrder + $vIndex + 1; 
 
@@ -210,7 +212,8 @@ class MilestoneController extends Controller
                     'description'     => $valleyObjective,
                     'step_order'      => $step_order,
                     'is_premium'      => true, 
-                    'target_deadline' => $deadline->format('Y-m-d'), 
+                    'start_date'      => $globalStartDate,  // <-- DATA BARU
+                    'target_date'     => $globalTargetDate, // <-- DATA BARU
                     'status'          => 'pending',
                     'source'          => 'system',
                     'is_mandatory'    => true,
@@ -219,9 +222,9 @@ class MilestoneController extends Controller
                 ]);
 
                 foreach ($valley['checkpoints'] ?? [] as $checkpoint) {
-                    $cpDeadline = isset($checkpoint['target_deadline']) 
-                        ? Carbon::parse($checkpoint['target_deadline'])->format('Y-m-d') 
-                        : $deadline->format('Y-m-d');
+                    // Checkpoint jarang punya timeline, kita fallback ke tanggal global
+                    $cpStartDate = isset($checkpoint['timeline']['start_date']) ? Carbon::parse($checkpoint['timeline']['start_date'])->format('Y-m-d') : $globalStartDate;
+                    $cpTargetDate = isset($checkpoint['timeline']['target_date']) ? Carbon::parse($checkpoint['timeline']['target_date'])->format('Y-m-d') : $globalTargetDate;
                     
                     $cpName = $checkpoint['title'] ?? $checkpoint['name'] ?? 'Tahapan';
 
@@ -234,7 +237,8 @@ class MilestoneController extends Controller
                         'description'     => $checkpoint['description'] ?? null,
                         'step_order'      => $step_order,
                         'is_premium'      => true, 
-                        'target_deadline' => $cpDeadline,
+                        'start_date'      => $cpStartDate,  // <-- DATA BARU
+                        'target_date'     => $cpTargetDate, // <-- DATA BARU
                         'status'          => 'pending',
                         'source'          => 'system',
                         'is_mandatory'    => true,
@@ -245,6 +249,15 @@ class MilestoneController extends Controller
                     foreach ($checkpoint['tasks'] ?? [] as $task) {
                         $taskName = $task['title'] ?? $task['name'] ?? 'Tugas';
                         
+                        // Menarik Tanggal Spesifik dari setiap Task!
+                        $tStartDate = isset($task['timeline']['start_date']) 
+                            ? Carbon::parse($task['timeline']['start_date'])->format('Y-m-d') 
+                            : $cpStartDate;
+
+                        $tTargetDate = isset($task['timeline']['target_date']) 
+                            ? Carbon::parse($task['timeline']['target_date'])->format('Y-m-d') 
+                            : $cpTargetDate;
+                        
                         UserMilestone::create([
                             'user_id'         => $user->id,
                             'parent_id'       => $checkpointModel->id, 
@@ -254,7 +267,8 @@ class MilestoneController extends Controller
                             'description'     => $task['description'] ?? null,
                             'step_order'      => $step_order,
                             'is_premium'      => true, 
-                            'target_deadline' => $cpDeadline, 
+                            'start_date'      => $tStartDate,  // <-- DATA BARU
+                            'target_date'     => $tTargetDate, // <-- DATA BARU
                             'status'          => 'pending',
                             'source'          => 'system',
                             'is_mandatory'    => $task['is_mandatory'] ?? true,
@@ -447,10 +461,6 @@ class MilestoneController extends Controller
         }
     }
 
-    /**
-     * TANDAI TASK SEBAGAI DISCOVERED
-     * (Berguna untuk trigger animasi reveal di frontend)
-     */
     public function markAsDiscovered(Request $request, $id)
     {
         $user = Auth::user();

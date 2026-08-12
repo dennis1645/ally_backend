@@ -19,6 +19,8 @@ class UserMilestone extends Model
         'step_order',     // Ditambahkan
         'is_premium',     // Ditambahkan
         'target_deadline',
+        'start_date',
+    'target_date',
         'status',
         'completed_at',
         'source',
