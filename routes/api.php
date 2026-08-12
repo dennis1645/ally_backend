@@ -26,7 +26,9 @@ use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\UserDeepDiagnosticController;
 use App\Http\Controllers\SupportTicketController;
-use App\Http\Controllers\AdminFinanceController; // <-- IMPORT BARU
+use App\Http\Controllers\AdminFinanceController;
+use App\Http\Controllers\MentorMatchingController;
+use App\Http\Controllers\EssayAssessmentController;
 
 // Email Verification
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -144,6 +146,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [DailyDrillController::class, 'show']);
     });
 
+    // Essay Assessment AI Routes
+    Route::prefix('essay')->group(function () {
+        Route::post('/assess', [EssayAssessmentController::class, 'assess']);
+        Route::get('/history', [EssayAssessmentController::class, 'history']);
+        Route::get('/{id}', [EssayAssessmentController::class, 'show']);
+    });
+
     // User Milestone & AI Timeline Routes
     Route::prefix('milestones')->group(function () {
         Route::get('/', [MilestoneController::class, 'getTimeline']);
@@ -193,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     Route::get('/mentor/availability', [MentorBookingController::class, 'getMentorAvailability']);
     Route::post('/mentor/book', [MentorBookingController::class, 'bookSession']);
+    Route::post('/mentor/match', [MentorMatchingController::class, 'matchMentors']);
     Route::get('/my-bookings', [MentorBookingController::class, 'getMyBookings']);
     Route::get('/my-bookings/reschedule-popups', [MentorBookingController::class, 'getReschedulePopups']);
     Route::patch('/my-bookings/{bookingId}/acknowledge-reschedule', [MentorBookingController::class, 'acknowledgeReschedule']);

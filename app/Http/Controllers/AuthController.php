@@ -166,7 +166,7 @@ class AuthController extends Controller
                     ]);
 
                     $user->update([
-                        'readiness_score' => $assessment->overall_score
+                        'readiness_score' => $assessment->readiness_percentage
                     ]);
 
                     $isFirstMilestoneCompleted = true;

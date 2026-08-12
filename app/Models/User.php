@@ -180,13 +180,22 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->status === 'suspended';
     }
 
-    // ==========================================
-    // RELASI SEBAGAI MENTEE / USER BIASA
-    // ==========================================
+    /**
+     * Relasi ke Mentor yang di-assign ke Mentee ini.
+     */
+    public function assignedMentor()
+    {
+        return $this->belongsTo(User::class, 'assigned_mentor_id')->with('mentorProfile');
+    }
 
     public function milestones()
     {
         return $this->hasMany(UserMilestone::class);
+    }
+
+    public function essayAssessments()
+    {
+        return $this->hasMany(EssayAssessment::class);
     }
 
     /**

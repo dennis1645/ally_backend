@@ -1256,6 +1256,104 @@
       "name": "User",
       "item": [
         {
+          "name": "Asesmen Esai AI (6 Jenis Valley)",
+          "item": [
+            {
+              "name": "[BARU] Submit Asesmen Esai (Upload Berkas / Teks -> AI Review)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "essay_text",
+                      "value": "Saya berkomitmen untuk menggunakan keahlian saya dalam bidang Artificial Intelligence untuk memajukan daerah pedesaan di Indonesia.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "essay_type",
+                      "value": "storytelling",
+                      "description": "Pilihan 6 Jenis: storytelling, motivation, leadership, impact, scholarship_alignment, clarity",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title",
+                      "value": "Esai Kontribusi Beasiswa LPDP",
+                      "type": "text"
+                    },
+                    {
+                      "key": "essay_file",
+                      "type": "file",
+                      "src": "",
+                      "description": "Berkas Dokumen Esai (PDF, DOC, DOCX, TXT - Maks 10MB)"
+                    },
+                    {
+                      "key": "user_milestone_id",
+                      "value": "1",
+                      "description": "Opsional: ID Task Milestone. Jika overall_score >= 70, task otomatis completed!",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/essay/assess",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "essay",
+                    "assess"
+                  ]
+                },
+                "description": "Mengirimkan berkas atau teks esai untuk dievaluasi oleh AI. Membutuhkan 1 Token. Batas maksimal 3 kali per hari per user. Jika linked ke user_milestone_id dan overall_score >= 70, task milestone otomatis diselesaikan."
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Riwayat Asesmen Esai User",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/essay/history",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "essay",
+                    "history"
+                  ]
+                },
+                "description": "Menampilkan daftar riwayat hasil evaluasi esai milik user beserta sisa kuota harian dan sisa saldo token."
+              },
+              "response": []
+            },
+            {
+              "name": "[BARU] Detail Hasil Asesmen Esai Spesifik",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/essay/1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "essay",
+                    "1"
+                  ]
+                },
+                "description": "Mengambil detail hasil analisis esai spesifik (termasuk skor per kategori, strengths, weaknesses, dan recommendations)."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
           "name": "Daily Jurnal Users",
           "item": [
             {
@@ -1786,6 +1884,35 @@
               "response": []
             },
             {
+              "name": "[BARU] AI Mentor Matcher (Match Mentor Beasiswa)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"profile\": {\r\n    \"student_profile\": {\r\n      \"academic\": {\r\n        \"study_direction\": \"Computer Science\"\r\n      },\r\n      \"leadership\": {\r\n        \"experience\": []\r\n      },\r\n      \"career\": {\r\n        \"contribution_area\": \"Technology\"\r\n      }\r\n    },\r\n    \"scholarship\": {\r\n      \"name\": \"LPDP Scholarship\"\r\n    }\r\n  }\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/mentor/match",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "mentor",
+                    "match"
+                  ]
+                },
+                "description": "Mencocokkan profil mentee/student dengan mentor berorientasi beasiswa melalui AI Microservice (atau profil mentee di database secara otomatis jika body kosong)."
+              },
+              "response": []
+            },
+            {
               "name": "Riwayat Booking Saya",
               "request": {
                 "method": "GET",
@@ -1804,7 +1931,7 @@
               "response": []
             },
             {
-              "name": "[BARU] Ambil Pop-Up Notifikasi Reschedule (Mentee Dashboard)",
+              "name": "Ambil Pop-Up Notifikasi Reschedule (Mentee Dashboard)",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -1824,7 +1951,7 @@
               "response": []
             },
             {
-              "name": "[BARU] Acknowledge Pop-Up Reschedule (Tutup Modal Pop-Up)",
+              "name": "Acknowledge Pop-Up Reschedule (Tutup Modal Pop-Up)",
               "request": {
                 "method": "PATCH",
                 "header": [],

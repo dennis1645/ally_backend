@@ -15,7 +15,7 @@ class ProfileController extends Controller
         $user = $request->user();
         
         // Memuat relasi badges dan mentorProfile (jika ada)
-        $user->load(['badges', 'mentorProfile']);
+        $user->load(['badges', 'mentorProfile', 'assignedMentor']);
         
         // Sembunyikan field password dari response
         $user->makeHidden(['password']);
@@ -160,7 +160,7 @@ class ProfileController extends Controller
             'status' => 'success',
             'message' => 'Profile updated successfully.',
             // Refresh data user, load badges & mentorProfile, dan sembunyikan password
-            'data' => $user->fresh()->load(['badges', 'mentorProfile'])->makeHidden(['password'])
+            'data' => $user->fresh()->load(['badges', 'mentorProfile', 'assignedMentor'])->makeHidden(['password'])
         ]);
     }
 }
