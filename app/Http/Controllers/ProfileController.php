@@ -9,25 +9,38 @@ use Illuminate\Support\Str;
 
 class ProfileController extends Controller
 {
-    // Menampilkan data profil (termasuk relasi badges dan profil mentor)
+    // Menampilkan data profil (termasuk relasi badges, profil mentor, dan target beasiswa)
     public function show(Request $request)
     {
         $user = $request->user();
         
-        // Memuat relasi badges dan mentorProfile (jika ada)
-        $user->load(['badges', 'mentorProfile', 'assignedMentor']);
+        // Memuat relasi badges, mentorProfile, scholarships, dan assignedMentor
+        $user->load(['badges', 'mentorProfile', 'scholarships', 'assignedMentor']);
         
         // Sembunyikan field password dari response
         $user->makeHidden(['password']);
 
+        // Ubah model ke array untuk memanipulasi struktur response
+        $userData = $user->toArray();
+
+        // Ambil beasiswa utama/pertama yang dipilih user dari tabel pivot
+        $selectedScholarship = $user->scholarships->first();
+
+        // Tambahkan ID dan Data Beasiswa ke dalam payload profil
+        $userData['target_scholarship_id'] = $selectedScholarship ? $selectedScholarship->id : null;
+        $userData['target_scholarship_data'] = $selectedScholarship ? $selectedScholarship : null;
+
+        // Hapus array bawaan relasi agar response lebih rapi (opsional)
+        unset($userData['scholarships']);
+
         return response()->json([
             'status' => 'success',
             'message' => 'Profile data retrieved successfully.',
-            'data' => $user
+            'data' => $userData
         ]);
     }
 
-    // Mengupdate data profil User & MentorProfile
+    // Mengupdate data profil User, Target Beasiswa, Data Rekening Bank & MentorProfile
     public function update(Request $request)
     {
         $user = $request->user();
@@ -50,11 +63,20 @@ class ProfileController extends Controller
             'undergraduate_major' => 'sometimes|string|max:255',
             'target_major' => 'sometimes|string|max:255',
             'primary_scholarship_target' => 'sometimes|string|max:255',
+            
+            // Field untuk memilih Target Beasiswa dari Master Data
+            'scholarship_id' => 'sometimes|nullable|exists:scholarships,id',
         ];
 
         // 3. Tambahkan Rule Mentor JIKA role-nya mengizinkan
         if ($isMentorOrAdmin) {
             $rules = array_merge($rules, [
+                // Rekening Bank (disimpan di tabel users)
+                'bank_name' => 'sometimes|nullable|string|max:255',
+                'bank_account_number' => 'sometimes|nullable|string|max:255',
+                'bank_account_name' => 'sometimes|nullable|string|max:255',
+                
+                // Profil Mentor (disimpan di tabel mentor_profiles)
                 'university' => 'sometimes|string|max:255',
                 'major' => 'sometimes|string|max:255',
                 'degree_level' => 'sometimes|string|max:255',
@@ -89,7 +111,6 @@ class ProfileController extends Controller
             ], 422);
         }
 
-        // Data yang tervalidasi (Otomatis akan membuang field mentor jika role-nya 'user')
         $validated = $validator->validated();
         
         // ==========================================
@@ -99,6 +120,11 @@ class ProfileController extends Controller
             'name', 'phone_number', 'gender', 'headline', 'bio', 'linkedin_id',
             'gpa', 'undergraduate_major', 'target_major', 'primary_scholarship_target'
         ];
+
+        // Izinkan mentor/admin mengupdate informasi bank mereka
+        if ($isMentorOrAdmin) {
+            array_push($userAllowedFields, 'bank_name', 'bank_account_number', 'bank_account_name');
+        }
         
         $updateUserData = [];
         foreach ($userAllowedFields as $field) {
@@ -130,7 +156,20 @@ class ProfileController extends Controller
         }
 
         // ==========================================
-        // 5. UPDATE DATA MENTOR PROFILE (Hanya Mentor/Admin)
+        // 5. SINKRONISASI SCHOLARSHIP (Tabel Pivot)
+        // ==========================================
+        if (array_key_exists('scholarship_id', $validated)) {
+            if (!empty($validated['scholarship_id'])) {
+                // Gunakan sync untuk memastikan user hanya menargetkan 1 beasiswa utama
+                $user->scholarships()->sync([$validated['scholarship_id']]);
+            } else {
+                // Jika request kosong (null), hapus target beasiswa
+                $user->scholarships()->detach();
+            }
+        }
+
+        // ==========================================
+        // 6. UPDATE DATA MENTOR PROFILE (Hanya Mentor/Admin)
         // ==========================================
         if ($isMentorOrAdmin) {
             $mentorAllowedFields = [
@@ -156,11 +195,20 @@ class ProfileController extends Controller
             }
         }
 
+        // Refresh data untuk Response akhir
+        $user->refresh()->load(['badges', 'mentorProfile', 'scholarships', 'assignedMentor']);
+        $user->makeHidden(['password']);
+        $responseUserData = $user->toArray();
+
+        $selectedScholarship = $user->scholarships->first();
+        $responseUserData['target_scholarship_id'] = $selectedScholarship ? $selectedScholarship->id : null;
+        $responseUserData['target_scholarship_data'] = $selectedScholarship ? $selectedScholarship : null;
+        unset($responseUserData['scholarships']);
+
         return response()->json([
             'status' => 'success',
             'message' => 'Profile updated successfully.',
-            // Refresh data user, load badges & mentorProfile, dan sembunyikan password
-            'data' => $user->fresh()->load(['badges', 'mentorProfile', 'assignedMentor'])->makeHidden(['password'])
+            'data' => $responseUserData
         ]);
     }
 }
