@@ -19,6 +19,46 @@ class EssayAssessmentService
 {
     protected string $llamaApiUrl;
 
+    public static array $aiTaskToDbTitleMap = [
+        'leadership-activities'     => 'List your leadership experiences',
+        'leadership-role'           => 'Describe your role',
+        'leadership-impact'         => 'Measure your impact',
+        'leadership-star'           => 'Write one STAR story',
+        'leadership-lesson'         => 'Explain what you learned',
+        'essay-motivation'          => 'Why this scholarship?',
+        'essay-university'          => 'Why this university?',
+        'essay-star-story'          => 'Write using the STAR method',
+        'essay-impact'              => 'Add measurable impact',
+        'essay-clarity'             => 'Check your story flow',
+        'essay-alignment'           => 'Check scholarship alignment',
+        'application-cv'             => 'Update your CV',
+        'application-transcript'     => 'Prepare academic documents',
+        'application-recommendation' => 'Prepare recommendation letters',
+        'application-requirements'   => 'Check every requirement',
+        'application-proofread'      => 'Proofread everything',
+        'application-submit'         => 'Submit your application',
+    ];
+
+    public static array $dbTitleToAiTaskMap = [
+        'List your leadership experiences'  => 'leadership-activities',
+        'Describe your role'                => 'leadership-role',
+        'Measure your impact'               => 'leadership-impact',
+        'Write one STAR story'              => 'leadership-star',
+        'Explain what you learned'          => 'leadership-lesson',
+        'Why this scholarship?'             => 'essay-motivation',
+        'Why this university?'              => 'essay-university',
+        'Write using the STAR method'       => 'essay-star-story',
+        'Add measurable impact'             => 'essay-impact',
+        'Check your story flow'             => 'essay-clarity',
+        'Check scholarship alignment'       => 'essay-alignment',
+        'Update your CV'                    => 'application-cv',
+        'Prepare academic documents'        => 'application-transcript',
+        'Prepare recommendation letters'    => 'application-recommendation',
+        'Check every requirement'           => 'application-requirements',
+        'Proofread everything'              => 'application-proofread',
+        'Submit your application'           => 'application-submit',
+    ];
+
     public function __construct()
     {
         $baseUrl = config('services.llama.url') ?? env('LLAMA_API_URL', 'https://bodacious-armed-tightwad.ngrok-free.dev/api');
@@ -26,7 +66,67 @@ class EssayAssessmentService
     }
 
     /**
-     * Memproses Penilaian Esai oleh AI Microservice
+     * Resolves matching UserMilestone model and AI taskId string bidirectionally.
+     */
+    public function resolveMilestoneAndAiTask(User $user, array $requestData, string $essayType): array
+    {
+        $rawTaskId = $requestData['taskId'] ?? $requestData['user_milestone_id'] ?? null;
+
+        $milestone = null;
+        $aiTaskId = null;
+
+        if ($rawTaskId) {
+            if (is_numeric($rawTaskId)) {
+                // Numeric DB ID supplied (e.g. 14 or 24)
+                $milestone = UserMilestone::where('user_id', $user->id)
+                    ->where('id', (int) $rawTaskId)
+                    ->first();
+
+                if ($milestone && isset(static::$dbTitleToAiTaskMap[$milestone->task_name])) {
+                    $aiTaskId = static::$dbTitleToAiTaskMap[$milestone->task_name];
+                }
+            } else {
+                // String AI taskId supplied (e.g. "essay-university" or "application-transcript")
+                $aiTaskId = (string) $rawTaskId;
+                $matchingTitle = static::$aiTaskToDbTitleMap[$aiTaskId] ?? null;
+
+                if ($matchingTitle) {
+                    $milestone = UserMilestone::where('user_id', $user->id)
+                        ->where('task_name', $matchingTitle)
+                        ->first();
+                } else {
+                    // Try loose search by title substring
+                    $cleanKey = str_replace(['essay-', 'application-', 'leadership-'], '', $aiTaskId);
+                    $milestone = UserMilestone::where('user_id', $user->id)
+                        ->where('task_name', 'LIKE', "%{$cleanKey}%")
+                        ->first();
+                }
+            }
+        }
+
+        // Fallbacks if milestone not found by taskId
+        if (!$milestone && !empty($requestData['user_milestone_id'])) {
+            $milestone = UserMilestone::where('user_id', $user->id)
+                ->where('id', $requestData['user_milestone_id'])
+                ->first();
+        }
+
+        if (!$aiTaskId) {
+            if ($milestone && isset(static::$dbTitleToAiTaskMap[$milestone->task_name])) {
+                $aiTaskId = static::$dbTitleToAiTaskMap[$milestone->task_name];
+            } else {
+                $aiTaskId = 'essay-' . $essayType;
+            }
+        }
+
+        return [
+            'milestone' => $milestone,
+            'aiTaskId'  => $aiTaskId,
+        ];
+    }
+
+    /**
+     * Memproses Penilaian Esai oleh AI Microservice & Menyinkronkan Milestone DB
      */
     public function assessEssay(User $user, array $data, ?UploadedFile $file = null): array
     {
@@ -44,7 +144,19 @@ class EssayAssessmentService
             throw new \Exception("Saldo token Anda tidak mencukupi (Sisa: {$user->token_balance} token). Diperlukan 1 token untuk melakukan asesmen esai.", 402);
         }
 
-        // 3. PROSES FILE & EKSTRAKSI TEKS ESAI
+        // 3. RESOLVE PENERJEMAH 2-ARAH (TASK ID AI <-> DB MILESTONE)
+        $essayType = $data['essay_type'] ?? 'motivation';
+        $resolved = $this->resolveMilestoneAndAiTask($user, $data, $essayType);
+        $milestone = $resolved['milestone'];
+        $aiTaskId  = $resolved['aiTaskId'];
+
+        // Inject resolved values to payload data
+        $data['taskId'] = $aiTaskId;
+        if ($milestone) {
+            $data['user_milestone_id'] = $milestone->id;
+        }
+
+        // 4. PROSES FILE & EKSTRAKSI TEKS ESAI
         $originalFilename = null;
         $filePath = null;
         $essayText = $data['essay_text'] ?? null;
@@ -63,40 +175,43 @@ class EssayAssessmentService
                 $essayText = $this->extractTextFromFile($file, $storedPath);
             }
 
+            $validVaultFileTypes = ['cv', 'transcript', 'certificate', 'essay', 'loa', 'other'];
+            $vaultFileType = in_array(strtolower($data['essay_type'] ?? ''), $validVaultFileTypes) 
+                ? strtolower($data['essay_type']) 
+                : 'essay';
+
             // Simpan otomatis ke Brankas / Document Vault
             DocumentVault::create([
                 'user_id'       => $user->id,
                 'file_name'     => $originalFilename,
-                'file_type'     => $data['essay_type'] ?? 'essay',
-                'file_url'      => $filePath,
+                'file_path'     => $storedPath,
+                'mime_type'     => $file->getMimeType(),
                 'file_size'     => $file->getSize(),
-                'status'        => 'verified',
-                'share_token'   => Str::random(32),
-                'verified_at'   => now(),
+                'file_type'     => $vaultFileType,
+                'status'        => 'uploaded',
             ]);
         }
 
-        if (empty(trim($essayText ?? ''))) {
+        if (empty(trim($essayText ?? '')) && !$file) {
             throw new \Exception("Konten esai kosong. Harap unggah berkas dokumen esai atau masukkan teks esai.", 422);
         }
 
-        $essayType = $data['essay_type'] ?? 'general';
-        $title = $data['title'] ?? ($originalFilename ? pathinfo($originalFilename, PATHINFO_FILENAME) : 'Asesmen Esai ' . ucfirst($essayType));
+        $title = $data['title'] ?? ($milestone ? $milestone->task_name : ($originalFilename ? pathinfo($originalFilename, PATHINFO_FILENAME) : 'Asesmen Esai ' . ucfirst($essayType)));
 
-        // 4. KIRIM REQUEST BERKAS FILE KE AI MICROSERVICE (OCR PROCESSING)
-        $aiResult = $this->callAIEssayEvaluator($essayText, $essayType, $scholarshipName = $user->primary_scholarship_target ?? 'Beasiswa Target', $file);
+        // 5. KIRIM REQUEST BERKAS FILE KE AI MICROSERVICE (OCR & JOURNEY TASK UPLOAD)
+        $aiResult = $this->callAIEssayEvaluator($user, $essayText, $essayType, $scholarshipName = $user->primary_scholarship_target ?? 'Beasiswa Target', $data, $file);
 
         DB::beginTransaction();
         try {
-            // 5. POTONG SALDO TOKEN USER (1 Token)
+            // 6. POTONG SALDO TOKEN USER (1 Token)
             $user->decrement('token_balance', 1);
 
             $score = $aiResult['score'] ?? $aiResult['overall_score'] ?? 0;
 
-            // 6. SIMPAN HASIL ASESMEN KE DATABASE
+            // 7. SIMPAN HASIL ASESMEN KE DATABASE
             $assessment = EssayAssessment::create([
                 'user_id'            => $user->id,
-                'user_milestone_id'  => $data['user_milestone_id'] ?? null,
+                'user_milestone_id'  => $milestone ? $milestone->id : null,
                 'essay_type'         => $essayType,
                 'title'              => $title,
                 'original_filename'  => $originalFilename,
@@ -112,43 +227,42 @@ class EssayAssessmentService
                 'token_cost'         => 1,
             ]);
 
-            // 7. INTEGRASI MILESTONE / TASK (JIKA DISERTAKAN user_milestone_id)
+            // 8. SINKRONISASI MILESTONE LOCAL DB (OTOMATIS SELESAI JIKA SCORE >= 70 ATAU TASK COMPLETED)
             $milestoneCompleted = false;
             $gamificationData = null;
 
-            if (!empty($data['user_milestone_id'])) {
-                $milestone = UserMilestone::where('user_id', $user->id)
-                    ->where('id', $data['user_milestone_id'])
-                    ->first();
+            if ($milestone) {
+                $effectiveScore = max($assessment->score, $assessment->overall_score);
+                $aiCompletedFlag = isset($aiResult['task']['completed']) && $aiResult['task']['completed'] === true;
 
-                if ($milestone) {
-                    $effectiveScore = max($assessment->score, $assessment->overall_score);
+                // Simpan submission di milestone
+                MilestoneSubmission::create([
+                    'user_id'           => $user->id,
+                    'user_milestone_id' => $milestone->id,
+                    'submission_type'   => 'both',
+                    'text_response'     => "Hasil Asesmen AI Esai: Score {$effectiveScore}/100",
+                    'file_path'         => $filePath,
+                    'file_name'         => $originalFilename ?? ('essay_' . $essayType . '.pdf'),
+                    'review_status'     => ($effectiveScore >= 70 || $aiCompletedFlag) ? 'approved' : 'pending',
+                    'mentor_feedback'   => "AI Score: {$effectiveScore}. Recommended Focus: " . implode('; ', array_slice($assessment->recommendations ?? [], 0, 2)),
+                    'reviewed_at'       => now(),
+                    'xp_awarded'        => ($effectiveScore >= 70 || $aiCompletedFlag) ? ($milestone->xp_reward ?? 50) : 0,
+                ]);
 
-                    // Simpan submission di milestone
-                    MilestoneSubmission::create([
-                        'user_milestone_id' => $milestone->id,
-                        'text_response'     => "Hasil Asesmen AI Esai: Score {$effectiveScore}/100",
-                        'file_url'          => $filePath,
-                        'review_status'     => ($effectiveScore >= 70) ? 'approved' : 'pending',
-                        'feedback_notes'    => "AI Score: {$effectiveScore}. Recommended Focus: " . implode('; ', array_slice($assessment->recommendations ?? [], 0, 2)),
-                        'reviewed_at'       => now(),
+                // Jika Nilai Score >= 70 ATAU AI menyatakan completed, Otomatis Tandai Task Milestone Completed di DB Local!
+                if (($effectiveScore >= 70 || $aiCompletedFlag) && $milestone->status !== 'completed') {
+                    $milestone->update([
+                        'status'        => 'completed',
+                        'is_discovered' => true,
+                        'completed_at'  => now()
                     ]);
 
-                    // Jika Nilai Score >= 70, Otomatis Tandai Task Milestone Completed!
-                    if ($effectiveScore >= 70 && $milestone->status !== 'completed') {
-                        $milestone->update([
-                            'status'        => 'completed',
-                            'is_discovered' => true,
-                            'completed_at'  => now()
-                        ]);
+                    // Tambahkan XP Reward dari task milestone
+                    $gamificationData = GamificationService::addXpAndCheckBadges($user, $milestone->xp_reward ?? 50);
 
-                        // Tambahkan XP Reward dari task milestone
-                        $gamificationData = GamificationService::addXpAndCheckBadges($user, $milestone->xp_reward ?? 50);
-
-                        // Recalculate Mentee Readiness Score
-                        GamificationService::recalculateReadinessScore($user);
-                        $milestoneCompleted = true;
-                    }
+                    // Recalculate Mentee Readiness Score
+                    GamificationService::updateReadinessScore($user);
+                    $milestoneCompleted = true;
                 }
             }
 
@@ -157,11 +271,14 @@ class EssayAssessmentService
             $remainingQuota = 3 - ($todayCount + 1);
 
             return [
-                'assessment'          => $assessment,
-                'milestone_completed' => $milestoneCompleted,
+                'assessment'            => $assessment,
+                'milestone_completed'   => $milestoneCompleted,
                 'remaining_daily_quota' => max(0, $remainingQuota),
-                'remaining_token'     => $user->fresh()->token_balance,
-                'gamification'        => $gamificationData
+                'remaining_token'       => $user->fresh()->token_balance,
+                'gamification'          => $gamificationData,
+                'journey'               => $aiResult['journey'] ?? null,
+                'task'                  => $aiResult['task'] ?? null,
+                'evaluation'            => $aiResult['evaluation'] ?? null,
             ];
 
         } catch (\Exception $e) {
@@ -172,58 +289,108 @@ class EssayAssessmentService
     }
 
     /**
-     * Memanggil Endpoint AI Microservice (Multipart Upload Berkas untuk OCR AI) / Local Fallback
+     * Memanggil Endpoint AI Microservice (Multipart Upload Berkas untuk OCR & Journey Task Upload)
      */
-    protected function callAIEssayEvaluator(?string $essayText, string $essayType, string $scholarshipName, ?UploadedFile $file = null): array
+    protected function callAIEssayEvaluator(User $user, ?string $essayText, string $essayType, string $scholarshipName, array $requestData, ?UploadedFile $file = null): array
     {
-        $endpoints = [
-            $this->llamaApiUrl . '/essay/assess',
-            $this->llamaApiUrl . '/essay-assessment',
-            $this->llamaApiUrl . '/essay'
-        ];
+        // 1. studentId dimasukkan user id (atau studentId dari request)
+        $studentId = $requestData['studentId'] ?? ('student-user-' . $user->id);
+        
+        // 2. taskId terjemahan resmi AI (e.g. essay-university, essay-motivation, application-transcript)
+        $taskId = $requestData['taskId'] ?? ('essay-' . $essayType);
 
-        foreach ($endpoints as $url) {
-            try {
-                $httpRequest = Http::timeout(60)
-                    ->withHeaders([
-                        'Accept'       => 'application/json',
-                        'ngrok-skip-browser-warning' => 'true'
-                    ]);
+        // 3. TARGET URL RESMI AI MICROSERVICE
+        $baseUrl = rtrim(config('services.llama.url') ?? env('LLAMA_API_URL', 'https://bodacious-armed-tightwad.ngrok-free.dev/api'), '/');
+        if (str_ends_with($baseUrl, '/journey/task/upload')) {
+            $targetUrl = $baseUrl;
+        } elseif (str_ends_with($baseUrl, '/api')) {
+            $targetUrl = $baseUrl . '/journey/task/upload';
+        } else {
+            $targetUrl = $baseUrl . '/api/journey/task/upload';
+        }
 
-                if ($file && file_exists($file->getRealPath())) {
-                    // Attach fisik berkas file untuk OCR AI Microservice
-                    $httpRequest->attach(
-                        'file',
-                        file_get_contents($file->getRealPath()),
-                        $file->getClientOriginalName(),
-                        ['Content-Type' => $file->getClientMimeType()]
-                    );
-                    $httpRequest->attach(
-                        'essay_file',
-                        file_get_contents($file->getRealPath()),
-                        $file->getClientOriginalName(),
-                        ['Content-Type' => $file->getClientMimeType()]
-                    );
-                }
+        try {
+            // LOG REQUEST PAYLOAD KE AI MICROSERVICE
+            Log::info("Payload Request dikirim ke AI Essay Microservice [Target: {$targetUrl}]:", [
+                'studentId'        => $studentId,
+                'taskId'           => $taskId,
+                'essay_type'       => $essayType,
+                'scholarship_name' => $scholarshipName,
+                'file_name'        => $file ? $file->getClientOriginalName() : null,
+                'file_size'        => $file ? $file->getSize() : null,
+                'essay_text_length'=> strlen($essayText ?? ''),
+            ]);
 
-                $response = $httpRequest->post($url, [
-                    'essay_type'       => $essayType,
-                    'scholarship_name' => $scholarshipName,
-                    'essay_text'       => $essayText ?? '',
+            $httpRequest = Http::timeout(60)
+                ->withHeaders([
+                    'Accept'                       => 'application/json',
+                    'ngrok-skip-browser-warning' => 'true'
                 ]);
 
-                if ($response->successful()) {
-                    $json = $response->json();
-                    $data = isset($json['data']) ? $json['data'] : $json;
-
-                    if (isset($data['overall_score']) || isset($data['categories'])) {
-                        Log::info("Berhasil menerima hasil OCR & Evaluasi Esai dari AI Microservice.");
-                        return $this->formatAIResponse($data);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning("AI Endpoint {$url} tidak dapat dijangkau: " . $e->getMessage());
+            // Lampirkan berkas fisik sebagai multipart '-F file=@...'
+            if ($file && file_exists($file->getRealPath())) {
+                $httpRequest->attach(
+                    'file',
+                    file_get_contents($file->getRealPath()),
+                    $file->getClientOriginalName(),
+                    ['Content-Type' => $file->getClientMimeType()]
+                );
+            } elseif (!empty($essayText)) {
+                // Jika user mengirim teks tanpa berkas file, buat berkas teks temporer sebagai 'file'
+                $httpRequest->attach(
+                    'file',
+                    $essayText,
+                    'essay_submission.txt',
+                    ['Content-Type' => 'text/plain']
+                );
             }
+
+            // Kirim Multipart Form Data dengan studentId, taskId, dan metadata esai
+            $response = $httpRequest->post($targetUrl, [
+                'studentId'        => $studentId,
+                'taskId'           => $taskId,
+                'essay_type'       => $essayType,
+                'scholarship_name' => $scholarshipName,
+                'essay_text'       => $essayText ?? '',
+            ]);
+
+            // LOG RESPONS MENTAH DARI AI MICROSERVICE
+            Log::info("Respons Mentah diterima dari AI Essay Microservice [Target: {$targetUrl}]:", [
+                'status' => $response->status(),
+                'body'   => $response->json() ?? $response->body(),
+            ]);
+
+            if ($response->successful()) {
+                $json = $response->json();
+                $data = is_array($json) && isset($json['data']) ? $json['data'] : (is_array($json) ? $json : []);
+
+                // Cek jika AI mengembalikan warning / penolakan walau status 200
+                if (isset($json['success']) && $json['success'] === false) {
+                    $aiMsg = $json['message'] ?? "Verifikasi AI gagal: Harap unggah dokumen yang jelas.";
+                    throw new \Exception($aiMsg, 422);
+                }
+
+                if (isset($data['evaluation']) || isset($data['overall_score']) || isset($data['score']) || isset($data['success'])) {
+                    Log::info("Berhasil memproses & mengekstrak evaluasi esai dari AI Microservice.");
+                    return $this->formatAIResponse($data);
+                }
+            } else {
+                $json = $response->json();
+                Log::error("AI Essay Microservice Error Status {$response->status()} [Target: {$targetUrl}]:", [
+                    'body' => $response->body()
+                ]);
+
+                // Jika AI mengembalikan 422 / Validation Warning JSON, teruskan pesan dari AI ke user!
+                if (is_array($json) && (!empty($json['message']) || isset($json['warning']))) {
+                    $aiMessage = $json['message'] ?? "Dokumen tidak dapat diverifikasi oleh AI. Harap unggah berkas yang jelas.";
+                    throw new \Exception($aiMessage, 422);
+                }
+            }
+        } catch (\Exception $e) {
+            if ($e->getCode() === 422) {
+                throw $e; // Re-throw AI Validation Warning agar menghentikan transaksi dan tampil di user!
+            }
+            Log::warning("AI Endpoint {$targetUrl} Exception / tidak dapat dijangkau: " . $e->getMessage());
         }
 
         // Fallback Local Evaluator jika AI Service offline
@@ -232,43 +399,80 @@ class EssayAssessmentService
     }
 
     /**
-     * Format dan Validasi Struktur JSON Respon AI
+     * Format dan Validasi Struktur JSON Respon AI (Mendukung Objek 'evaluation', 'suggestions', 'score', 'journey')
      */
     protected function formatAIResponse(array $data): array
     {
+        $docType = $data['documentType'] ?? 'essay';
+        $isDocument = in_array(strtolower($docType), ['cv', 'transcript', 'recommendation', 'certificate', 'loa']);
+        $aiMessage = $data['message'] ?? null;
+
+        $evaluation = $data['evaluation'] ?? [];
+
+        if (empty($evaluation) && ($isDocument || isset($data['completed']))) {
+            $evaluation = [
+                'status'      => 'completed',
+                'message'     => $aiMessage ?? ucfirst($docType) . " uploaded and verified successfully.",
+                'suggestions' => [],
+                'canComplete' => true,
+            ];
+        }
+
+        $score = $evaluation['score'] 
+            ?? $data['score'] 
+            ?? $data['overall_score'] 
+            ?? ($isDocument ? 100 : 75);
+
+        $overallScore = $data['overall_score'] ?? $score;
+
         $categories = $data['categories'] ?? [
-            'storytelling'          => rand(70, 90),
-            'motivation'            => rand(70, 90),
-            'leadership'            => rand(70, 90),
-            'impact'                => rand(70, 90),
-            'scholarship_alignment' => rand(70, 90),
-            'clarity'               => rand(70, 90)
+            'storytelling'          => (int) $score,
+            'motivation'            => (int) $score,
+            'leadership'            => (int) $score,
+            'impact'                => (int) $score,
+            'scholarship_alignment' => (int) $score,
+            'clarity'               => (int) $score
         ];
 
-        $overallScore = $data['overall_score'] ?? (int) round(array_sum($categories) / count($categories));
-        $score = $data['score'] ?? $overallScore;
+        $defaultStrengths = $isDocument 
+            ? [ $aiMessage ?? "Document (" . strtoupper($docType) . ") uploaded and verified successfully." ]
+            : [
+                "Essay content demonstrates clear academic motivation and relevance to goals.",
+                "Structure and argument flow are cohesive and well-written."
+            ];
+
+        $defaultWeaknesses = $isDocument ? [] : [
+            "Leadership impact could be reinforced with further concrete metrics."
+        ];
+
+        $defaultSuggestions = $isDocument ? [] : [
+            "Consider providing more specific examples of how your experiences influenced your goals.",
+            "Highlight more explicit connections between your experiences and the scholarship's objective."
+        ];
+
+        $suggestions = $evaluation['suggestions'] 
+            ?? $data['recommendations'] 
+            ?? $data['suggestions'] 
+            ?? $defaultSuggestions;
 
         return [
             'score'         => (int) $score,
             'overall_score' => (int) $overallScore,
             'categories'    => [
-                'storytelling'          => (int) ($categories['storytelling'] ?? 75),
-                'motivation'            => (int) ($categories['motivation'] ?? 80),
-                'leadership'            => (int) ($categories['leadership'] ?? 75),
-                'impact'                => (int) ($categories['impact'] ?? 70),
-                'scholarship_alignment' => (int) ($categories['scholarship_alignment'] ?? 80),
-                'clarity'               => (int) ($categories['clarity'] ?? 85),
+                'storytelling'          => (int) ($categories['storytelling'] ?? $score),
+                'motivation'            => (int) ($categories['motivation'] ?? $score),
+                'leadership'            => (int) ($categories['leadership'] ?? $score),
+                'impact'                => (int) ($categories['impact'] ?? $score),
+                'scholarship_alignment' => (int) ($categories['scholarship_alignment'] ?? $score),
+                'clarity'               => (int) ($categories['clarity'] ?? $score),
             ],
-            'strengths'       => is_array($data['strengths'] ?? null) ? $data['strengths'] : [
-                "Naratif esai menunjukkan motivasi akademik yang cukup jelas.",
-                "Struktur penulisan esai mudah dipahami dan memiliki alur narasi yang logis."
-            ],
-            'weaknesses'      => is_array($data['weaknesses'] ?? null) ? $data['weaknesses'] : [
-                "Dampak kepemimpinan dan pencapaian masih dapat diperjelas dengan data kuantitatif."
-            ],
-            'recommendations' => is_array($data['recommendations'] ?? null) ? $data['recommendations'] : [
-                "Tambahkan angka atau indikator sukses spesifik pada bagian hasil proyek/kontribusi Anda."
-            ]
+            'strengths'       => is_array($data['strengths'] ?? null) ? $data['strengths'] : $defaultStrengths,
+            'weaknesses'      => is_array($data['weaknesses'] ?? null) ? $data['weaknesses'] : $defaultWeaknesses,
+            'recommendations' => is_array($suggestions) ? $suggestions : (is_array($defaultSuggestions) ? $defaultSuggestions : [$suggestions]),
+            'evaluation'      => $evaluation,
+            'journey'         => $data['journey'] ?? null,
+            'task'            => $data['task'] ?? null,
+            'documentType'    => $docType,
         ];
     }
 

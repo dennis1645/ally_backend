@@ -25,12 +25,24 @@ class EssayAssessmentController extends Controller
     {
         $user = Auth::guard('sanctum')->user() ?? Auth::user();
 
-        $validator = Validator::make($request->all(), [
+        $uploadedFile = $request->file('file') ?? $request->file('essay_file');
+
+        $requestData = $request->all();
+
+        // Jika taskId berisi angka (misal: taskId=3), otomatis dipetakan ke user_milestone_id
+        if (!empty($requestData['taskId']) && is_numeric($requestData['taskId']) && empty($requestData['user_milestone_id'])) {
+            $requestData['user_milestone_id'] = (int) $requestData['taskId'];
+        }
+
+        $validator = Validator::make($requestData, [
+            'file'               => 'nullable|file|mimes:pdf,doc,docx,txt|max:10240',
             'essay_file'         => 'nullable|file|mimes:pdf,doc,docx,txt|max:10240',
             'essay_text'         => 'nullable|string|min:20',
-            'essay_type'         => 'nullable|string|in:storytelling,motivation,leadership,impact,scholarship_alignment,clarity,general',
+            'essay_type'         => 'nullable|string',
             'title'              => 'nullable|string|max:255',
             'user_milestone_id'  => 'nullable|exists:user_milestones,id',
+            'studentId'          => 'nullable|string|max:255',
+            'taskId'             => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -41,7 +53,7 @@ class EssayAssessmentController extends Controller
             ], 422);
         }
 
-        if (!$request->hasFile('essay_file') && empty(trim($request->input('essay_text', '')))) {
+        if (!$uploadedFile && empty(trim($requestData['essay_text'] ?? ''))) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Harap unggah berkas esai (PDF/DOCX/TXT) atau masukkan teks esai untuk dianalisis.'
@@ -49,7 +61,7 @@ class EssayAssessmentController extends Controller
         }
 
         try {
-            $result = $this->essayService->assessEssay($user, $request->all(), $request->file('essay_file'));
+            $result = $this->essayService->assessEssay($user, $requestData, $uploadedFile);
 
             return response()->json([
                 'status'  => 'success',
@@ -70,6 +82,9 @@ class EssayAssessmentController extends Controller
                     'remaining_daily_quota' => $result['remaining_daily_quota'],
                     'milestone_completed'   => $result['milestone_completed'],
                     'gamification'          => $result['gamification'],
+                    'evaluation'            => $result['evaluation'],
+                    'journey'               => $result['journey'],
+                    'task'                  => $result['task'],
                     'created_at'            => $result['assessment']->created_at,
                 ]
             ], 200);

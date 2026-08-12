@@ -77,4 +77,12 @@ class GamificationService
             return $finalScore;
         }
     }
+
+    /**
+     * Alias method untuk recalculateReadinessScore agar kompatibel dengan semua service.
+     */
+    public static function recalculateReadinessScore(User $user)
+    {
+        return static::updateReadinessScore($user);
+    }
 }

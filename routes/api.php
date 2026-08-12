@@ -146,11 +146,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [DailyDrillController::class, 'show']);
     });
 
-    // Essay Assessment AI Routes
+    // Essay Assessment AI Routes & Journey Upload
     Route::prefix('essay')->group(function () {
         Route::post('/assess', [EssayAssessmentController::class, 'assess']);
         Route::get('/history', [EssayAssessmentController::class, 'history']);
         Route::get('/{id}', [EssayAssessmentController::class, 'show']);
+    });
+
+    Route::prefix('journey')->group(function () {
+        Route::post('/task/upload', [EssayAssessmentController::class, 'assess']);
     });
 
     // User Milestone & AI Timeline Routes

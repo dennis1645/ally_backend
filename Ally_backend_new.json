@@ -1259,13 +1259,75 @@
           "name": "Asesmen Esai AI (6 Jenis Valley)",
           "item": [
             {
-              "name": "[BARU] Submit Asesmen Esai (Upload Berkas / Teks -> AI Review)",
+              "name": "[UTAMA] Upload Task Journey Esai / Dokumen (POST /api/journey/task/upload)",
               "request": {
                 "method": "POST",
                 "header": [],
                 "body": {
                   "mode": "formdata",
                   "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "",
+                      "description": "File Dokumen Esai (PDF, DOC, DOCX, TXT)"
+                    },
+                    {
+                      "key": "studentId",
+                      "value": "student-new-journey-test-001",
+                      "description": "ID Student / User",
+                      "type": "text"
+                    },
+                    {
+                      "key": "taskId",
+                      "value": "3",
+                      "description": "ID Task / Milestone (misal: 3 atau essay-university)",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/journey/task/upload",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "journey",
+                    "task",
+                    "upload"
+                  ]
+                },
+                "description": "Endpoint utama upload esai & dokumen milestone sesuai format cURL AI Microservice."
+              },
+              "response": []
+            },
+            {
+              "name": "Submit Asesmen Esai (POST /api/essay/assess)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "essay_file",
+                      "type": "file",
+                      "src": "",
+                      "description": "Berkas Dokumen Esai (PDF, DOC, DOCX, TXT - Maks 10MB)"
+                    },
+                    {
+                      "key": "studentId",
+                      "value": "student-new-journey-test-001",
+                      "description": "Opsional: ID Student AI Microservice",
+                      "type": "text"
+                    },
+                    {
+                      "key": "taskId",
+                      "value": "3",
+                      "description": "Opsional: ID Task AI Microservice (3 atau essay-university)",
+                      "type": "text"
+                    },
                     {
                       "key": "essay_text",
                       "value": "Saya berkomitmen untuk menggunakan keahlian saya dalam bidang Artificial Intelligence untuk memajukan daerah pedesaan di Indonesia.",
@@ -1283,14 +1345,8 @@
                       "type": "text"
                     },
                     {
-                      "key": "essay_file",
-                      "type": "file",
-                      "src": "",
-                      "description": "Berkas Dokumen Esai (PDF, DOC, DOCX, TXT - Maks 10MB)"
-                    },
-                    {
                       "key": "user_milestone_id",
-                      "value": "1",
+                      "value": "3",
                       "description": "Opsional: ID Task Milestone. Jika overall_score >= 70, task otomatis completed!",
                       "type": "text"
                     }
@@ -1307,12 +1363,12 @@
                     "assess"
                   ]
                 },
-                "description": "Mengirimkan berkas atau teks esai untuk dievaluasi oleh AI. Membutuhkan 1 Token. Batas maksimal 3 kali per hari per user. Jika linked ke user_milestone_id dan overall_score >= 70, task milestone otomatis diselesaikan."
+                "description": "Mengirimkan berkas atau teks esai untuk dievaluasi oleh AI Microservice."
               },
               "response": []
             },
             {
-              "name": "[BARU] Riwayat Asesmen Esai User",
+              "name": "Riwayat Asesmen Esai User",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -1327,12 +1383,12 @@
                     "history"
                   ]
                 },
-                "description": "Menampilkan daftar riwayat hasil evaluasi esai milik user beserta sisa kuota harian dan sisa saldo token."
+                "description": "Menampilkan daftar riwayat hasil evaluasi esai milik user."
               },
               "response": []
             },
             {
-              "name": "[BARU] Detail Hasil Asesmen Esai Spesifik",
+              "name": "Detail Hasil Asesmen Esai Spesifik",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -1347,7 +1403,7 @@
                     "1"
                   ]
                 },
-                "description": "Mengambil detail hasil analisis esai spesifik (termasuk skor per kategori, strengths, weaknesses, dan recommendations)."
+                "description": "Mengambil detail hasil analisis esai spesifik."
               },
               "response": []
             }
