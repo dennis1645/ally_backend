@@ -31,6 +31,7 @@ use Laravel\Sanctum\HasApiTokens;
     'xp_points', 
     'current_streak', 
     'longest_streak',
+    'is_streak_frozen',
     'is_premium',
     'assigned_mentor_id',
     
@@ -66,7 +67,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var array
      */
-    protected $appends = ['level', 'target_scholarship_id', 'target_scholarship_data'];
+    protected $appends = ['level', 'target_scholarship_id', 'target_scholarship_data', 'weekly_streak_tracker'];
 
     /**
      * Get the attributes that should be cast.
@@ -84,6 +85,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'xp_points' => 'integer',
             'current_streak' => 'integer',
             'longest_streak' => 'integer',
+            'is_streak_frozen' => 'boolean',
             'is_premium' => 'boolean',
             'gpa' => 'decimal:2', // Format angka desimal untuk IPK
             'session_rate' => 'decimal:2',
@@ -159,6 +161,59 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return Scholarship::with('universities:id,name,country,city,image_url')->find($scholarshipId);
+    }
+
+    /**
+     * Relasi ke Log Aktivitas Harian User (Weekly Streak Tracker).
+     */
+    public function dailyActivityLogs()
+    {
+        return $this->hasMany(UserDailyActivityLog::class, 'user_id');
+    }
+
+    /**
+     * Accessor untuk mengkalkulasi 7 hari Tracker Streak Mingguan (Senin - Minggu).
+     */
+    public function getWeeklyStreakTrackerAttribute(): array
+    {
+        $today = \Carbon\Carbon::now();
+        $startOfWeek = $today->copy()->startOfWeek(); // Senin
+
+        $logs = UserDailyActivityLog::where('user_id', $this->id)
+            ->whereBetween('activity_date', [$startOfWeek->toDateString(), $today->copy()->endOfWeek()->toDateString()])
+            ->get()
+            ->keyBy(function ($item) {
+                return \Carbon\Carbon::parse($item->activity_date)->toDateString();
+            });
+
+        $tracker = [];
+        for ($i = 0; $i < 7; $i++) {
+            $dayDate = $startOfWeek->copy()->addDays($i);
+            $dateStr = $dayDate->toDateString();
+            $dayName = $dayDate->format('D'); // Mon, Tue, Wed...
+
+            $isToday = $dayDate->isToday();
+            $isPast  = $dayDate->isPast() && !$isToday;
+
+            if (isset($logs[$dateStr])) {
+                $status = $logs[$dateStr]->status;
+            } elseif ($isPast) {
+                $status = $this->is_streak_frozen ? 'frozen' : 'missed';
+            } elseif ($isToday) {
+                $status = 'completed'; // Default hari ini aktif saat diakses
+            } else {
+                $status = 'upcoming';
+            }
+
+            $tracker[] = [
+                'day'      => $dayName,
+                'date'     => $dateStr,
+                'status'   => $status,
+                'is_today' => $isToday,
+            ];
+        }
+
+        return $tracker;
     }
 
     // ==========================================
