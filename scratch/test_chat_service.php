@@ -8,12 +8,12 @@ $kernel->bootstrap();
 use App\Models\User;
 use App\Services\AIMentorChatService;
 
-echo "=== TESTING AI MENTOR CHAT SERVICE ===\n";
+echo "=== TESTING ENRICHED ENGLISH AI MENTOR CHAT SERVICE ===\n";
 
 $user = User::find(4); // Mentee Jokowi
 $service = new AIMentorChatService();
 
-$result = $service->chat($user, "Bagaimana cara terbaik mempersiapkan esai LPDP untuk jurusan Public Policy?");
+$result = $service->chat($user, "What should I focus on next for my LPDP application, and how do I handle my mentor's action plans?");
 
 echo "USER MESSAGE:\n" . $result['user_message'] . "\n\n";
 echo "AI RESPONSE:\n" . $result['ai_response'] . "\n";
