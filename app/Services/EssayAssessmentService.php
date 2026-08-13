@@ -176,9 +176,16 @@ class EssayAssessmentService
             }
 
             $validVaultFileTypes = ['cv', 'transcript', 'certificate', 'essay', 'loa', 'other'];
-            $vaultFileType = in_array(strtolower($data['essay_type'] ?? ''), $validVaultFileTypes) 
-                ? strtolower($data['essay_type']) 
-                : 'essay';
+            $vaultFileType = 'essay';
+            if (str_contains($aiTaskId, 'cv')) {
+                $vaultFileType = 'cv';
+            } elseif (str_contains($aiTaskId, 'transcript')) {
+                $vaultFileType = 'transcript';
+            } elseif (str_contains($aiTaskId, 'recommendation')) {
+                $vaultFileType = 'certificate';
+            } elseif (in_array(strtolower($data['essay_type'] ?? ''), $validVaultFileTypes)) {
+                $vaultFileType = strtolower($data['essay_type']);
+            }
 
             // Simpan otomatis ke Brankas / Document Vault
             DocumentVault::create([
@@ -212,7 +219,7 @@ class EssayAssessmentService
             $assessment = EssayAssessment::create([
                 'user_id'            => $user->id,
                 'user_milestone_id'  => $milestone ? $milestone->id : null,
-                'essay_type'         => $essayType,
+                'essay_type'         => $aiTaskId ?? $essayType,
                 'title'              => $title,
                 'original_filename'  => $originalFilename,
                 'file_path'          => $filePath,
@@ -385,17 +392,22 @@ class EssayAssessmentService
                     $aiMessage = $json['message'] ?? "Dokumen tidak dapat diverifikasi oleh AI. Harap unggah berkas yang jelas.";
                     throw new \Exception($aiMessage, 422);
                 }
+
+                // Jika status error lain (misal ngrok offline ERR_NGROK_3200 / 404 / 500)
+                $body = $response->body();
+                if (str_contains($body, 'ERR_NGROK_3200') || str_contains($body, 'offline') || $response->status() === 404 || $response->status() >= 500) {
+                    throw new \Exception("Layanan AI sedang offline / tidak dapat dijangkau. Harap tunggu sebentar dan coba beberapa saat lagi.", 503);
+                }
             }
         } catch (\Exception $e) {
-            if ($e->getCode() === 422) {
-                throw $e; // Re-throw AI Validation Warning agar menghentikan transaksi dan tampil di user!
+            if ($e->getCode() === 422 || $e->getCode() === 503) {
+                throw $e; // Re-throw AI error agar menghentikan transaksi dan tampil di user!
             }
-            Log::warning("AI Endpoint {$targetUrl} Exception / tidak dapat dijangkau: " . $e->getMessage());
+            Log::error("AI Endpoint {$targetUrl} Exception / tidak dapat dijangkau: " . $e->getMessage());
+            throw new \Exception("Layanan AI sedang offline / tidak dapat dijangkau. Harap tunggu sebentar dan coba beberapa saat lagi.", 503);
         }
 
-        // Fallback Local Evaluator jika AI Service offline
-        Log::info("Menjalankan Local Fallback AI Essay Evaluator...");
-        return $this->fallbackLocalEssayEvaluator($essayText ?? '', $essayType);
+        throw new \Exception("Layanan AI sedang offline / tidak dapat dijangkau. Harap tunggu sebentar dan coba beberapa saat lagi.", 503);
     }
 
     /**

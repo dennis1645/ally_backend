@@ -44,7 +44,7 @@ class SmartNudgeSimulationSeeder extends Seeder
         UserMilestone::create([
             'user_id' => $user->id,
             'task_name' => 'Finalisasi Dokumen Pendaftaran Beasiswa (Hari H)',
-            'target_deadline' => $today->copy(),
+            'target_date' => $today->copy(),
             'status' => 'pending',
         ]);
 
@@ -52,7 +52,7 @@ class SmartNudgeSimulationSeeder extends Seeder
         UserMilestone::create([
             'user_id' => $user->id,
             'task_name' => 'Review Essay Motivasi Bersama Mentor (H-1)',
-            'target_deadline' => $today->copy()->addDays(1),
+            'target_date' => $today->copy()->addDays(1),
             'status' => 'pending',
         ]);
 
@@ -60,7 +60,7 @@ class SmartNudgeSimulationSeeder extends Seeder
         UserMilestone::create([
             'user_id' => $user->id,
             'task_name' => 'Simulasi Tes IELTS / Bahasa Inggris (H-3)',
-            'target_deadline' => $today->copy()->addDays(3),
+            'target_date' => $today->copy()->addDays(3),
             'status' => 'pending',
         ]);
 
@@ -68,7 +68,7 @@ class SmartNudgeSimulationSeeder extends Seeder
         UserMilestone::create([
             'user_id' => $user->id,
             'task_name' => 'Upload Sertifikat Pendukung (Overdue H+1)',
-            'target_deadline' => $today->copy()->subDays(1),
+            'target_date' => $today->copy()->subDays(1),
             'status' => 'pending',
         ]);
 

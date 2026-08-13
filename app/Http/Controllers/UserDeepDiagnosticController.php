@@ -145,42 +145,50 @@ class UserDeepDiagnosticController extends Controller
             ];
         }
 
-        // Extract rekomendasi beasiswa dari AI (kunci: beasiswa_recomendation / scholarship_recommendation)
+        // Extract rekomendasi beasiswa dari AI (kunci: recommendation / beasiswa_recomendation / scholarship_recommendation)
         $recommendedScholarshipId = null;
-        $rawRec = $aiAssessmentData['beasiswa_recomendation']
-            ?? $aiResponse['data']['beasiswa_recomendation']
-            ?? $aiResponse['beasiswa_recomendation'] 
-            ?? $aiAssessmentData['beasiswa_recommendation'] 
-            ?? $aiAssessmentData['scholarship_recommendation'] 
-            ?? $aiAssessmentData['recommended_scholarship_id'] 
+        $rawRec = $aiAssessmentData['recommendation']
+            ?? $aiAssessmentData['beasiswa_recomendation']
+            ?? ($aiResponse['data']['assessment']['recommendation'] ?? null)
+            ?? ($aiResponse['data']['beasiswa_recomendation'] ?? null)
+            ?? ($aiResponse['beasiswa_recomendation'] ?? null)
+            ?? ($aiAssessmentData['beasiswa_recommendation'] ?? null)
+            ?? ($aiAssessmentData['scholarship_recommendation'] ?? null)
+            ?? ($aiAssessmentData['recommended_scholarship_id'] ?? null)
             ?? null;
 
         if ($rawRec) {
             $scholarshipName = null;
             $possibleNumericId = null;
+            $slugId = null;
 
             if (is_array($rawRec)) {
-                // Ambil nama dari metadata.name, name, title, atau parse dari text
                 $scholarshipName = $rawRec['metadata']['name'] 
                     ?? $rawRec['name'] 
                     ?? $rawRec['title'] 
                     ?? null;
 
+                if (isset($rawRec['id'])) {
+                    if (is_numeric($rawRec['id'])) {
+                        $possibleNumericId = (int) $rawRec['id'];
+                    } else {
+                        $slugId = (string) $rawRec['id'];
+                    }
+                }
+
                 if (!$scholarshipName && !empty($rawRec['text'])) {
-                    // Contoh text: "Scholarship Name:\nLPDP Scholarship\n..."
                     if (preg_match('/Scholarship Name:\s*([^\n\r]+)/i', $rawRec['text'], $matches)) {
                         $scholarshipName = trim($matches[1]);
                     }
                 }
-
-                // Cek jika ID AI kebetulan numerik yang merujuk ke database kita
-                if (isset($rawRec['id']) && is_numeric($rawRec['id'])) {
-                    $possibleNumericId = (int) $rawRec['id'];
-                }
             } elseif (is_numeric($rawRec)) {
                 $possibleNumericId = (int) $rawRec;
             } elseif (is_string($rawRec)) {
-                $scholarshipName = $rawRec;
+                if (is_numeric($rawRec)) {
+                    $possibleNumericId = (int) $rawRec;
+                } else {
+                    $scholarshipName = $rawRec;
+                }
             }
 
             // A. Pertama, coba cari di DB kita berdasarkan ID numerik (jika ada)
@@ -191,7 +199,7 @@ class UserDeepDiagnosticController extends Controller
                 }
             }
 
-            // B. Jika belum ketemu, cari di DB kita berdasarkan NAMA beasiswa (Scholarship Matcher ke DB lokal)
+            // B. Cari di DB kita berdasarkan NAMA beasiswa (Scholarship Matcher ke DB lokal)
             if (!$recommendedScholarshipId && $scholarshipName) {
                 $cleanName = trim($scholarshipName);
 
@@ -216,7 +224,18 @@ class UserDeepDiagnosticController extends Controller
                 }
             }
 
-            // C. Fallback: Jika di DB lokal belum ada beasiswa yang cocok sama sekali, gunakan beasiswa pertama di database sebagai default
+            // C. Jika belum ketemu dan ada slug ID (misal "lpdp-001"), extract keyword "lpdp"
+            if (!$recommendedScholarshipId && $slugId) {
+                $slugKeyword = explode('-', $slugId)[0] ?? null;
+                if ($slugKeyword && strlen($slugKeyword) >= 3) {
+                    $foundScholarship = Scholarship::where('name', 'LIKE', '%' . $slugKeyword . '%')->first();
+                    if ($foundScholarship) {
+                        $recommendedScholarshipId = $foundScholarship->id;
+                    }
+                }
+            }
+
+            // D. Fallback: Jika di DB lokal belum ada beasiswa yang cocok sama sekali, gunakan beasiswa pertama di database
             if (!$recommendedScholarshipId) {
                 $defaultScholarship = Scholarship::first();
                 if ($defaultScholarship) {

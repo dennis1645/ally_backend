@@ -227,6 +227,14 @@ class MentorMatchingService
 
                     \Illuminate\Support\Facades\DB::commit();
                     \Illuminate\Support\Facades\Log::info("Otomatis mendaftarkan AI Mentor baru ke database lokal: {$aiName} (Email: {$email}, ID: {$matchedLocal->id})");
+
+                    // Kirim email kredensial login ke mentor baru yang di-generate!
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($matchedLocal->email)->send(new \App\Mail\MentorCredentialMail($matchedLocal, 'P@ssw0rd123'));
+                        \Illuminate\Support\Facades\Log::info("📧 Email kredensial login berhasil dikirim ke mentor baru: {$email}");
+                    } catch (\Exception $mailEx) {
+                        \Illuminate\Support\Facades\Log::error("Gagal mengirim email kredensial ke mentor {$email}: " . $mailEx->getMessage());
+                    }
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\DB::rollBack();
                     \Illuminate\Support\Facades\Log::error("Gagal mendaftarkan AI Mentor ke database lokal: " . $e->getMessage());

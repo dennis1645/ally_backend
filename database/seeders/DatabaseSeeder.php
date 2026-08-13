@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             ScholarshipSeeder::class,
             ShopItemSeeder::class,
             BadgeSeeder::class,
+            SmartNudgeSimulationSeeder::class,
         ]);
     }
 }

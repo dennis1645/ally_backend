@@ -545,7 +545,23 @@ class MilestoneController extends Controller
             ], 404);
         }
 
-        $validator = Validator::make($request->all(), [
+        $requestData = $request->all();
+        if (!empty($requestData['file_type'])) {
+            $rawType = strtolower($requestData['file_type']);
+            if (str_contains($rawType, 'cv')) {
+                $requestData['file_type'] = 'cv';
+            } elseif (str_contains($rawType, 'transcript')) {
+                $requestData['file_type'] = 'transcript';
+            } elseif (str_contains($rawType, 'recommendation') || str_contains($rawType, 'certificat')) {
+                $requestData['file_type'] = 'certificate';
+            } elseif (str_contains($rawType, 'essay') || str_contains($rawType, 'motivation') || str_contains($rawType, 'story')) {
+                $requestData['file_type'] = 'essay';
+            } elseif (str_contains($rawType, 'loa')) {
+                $requestData['file_type'] = 'loa';
+            }
+        }
+
+        $validator = Validator::make($requestData, [
             'text_response' => 'nullable|string',
             'file'          => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,zip,rar|max:10240',
             'file_type'     => 'nullable|in:cv,transcript,certificate,essay,loa,other',
@@ -568,9 +584,37 @@ class MilestoneController extends Controller
 
         DB::beginTransaction();
         try {
-            $documentVaultId = null;
-            $filePath = null;
-            $fileName = null;
+            // 1. Cek pengiriman jawaban lama dari mentee untuk task ini
+            $existingSubmission = MilestoneSubmission::where('user_milestone_id', $milestone->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            // 2. Jika ada berkas dokumen lama DAN mentee mengunggah berkas baru -> Hapus berkas lama dari storage & Document Vault!
+            if ($existingSubmission && $request->hasFile('file')) {
+                if (!empty($existingSubmission->file_path)) {
+                    if (Storage::disk('public')->exists($existingSubmission->file_path)) {
+                        Storage::disk('public')->delete($existingSubmission->file_path);
+                    }
+                    if (Storage::exists($existingSubmission->file_path)) {
+                        Storage::delete($existingSubmission->file_path);
+                    }
+                }
+
+                if (!empty($existingSubmission->document_vault_id)) {
+                    $oldVault = DocumentVault::find($existingSubmission->document_vault_id);
+                    if ($oldVault) {
+                        if (!empty($oldVault->file_path)) {
+                            if (Storage::disk('public')->exists($oldVault->file_path)) {
+                                Storage::disk('public')->delete($oldVault->file_path);
+                            }
+                            if (Storage::disk('local')->exists($oldVault->file_path)) {
+                                Storage::disk('local')->delete($oldVault->file_path);
+                            }
+                        }
+                        $oldVault->delete();
+                    }
+                }
+            }
 
             // Jika mentee mengunggah berkas dokumen -> Otomatis masuk ke Document Vault!
             if ($request->hasFile('file')) {
@@ -605,11 +649,11 @@ class MilestoneController extends Controller
                     'user_id'           => $user->id,
                 ],
                 [
-                    'document_vault_id' => $documentVaultId,
+                    'document_vault_id' => $documentVaultId ?? ($request->hasFile('file') ? null : ($existingSubmission->document_vault_id ?? null)),
                     'submission_type'   => $submissionType,
                     'text_response'     => $request->text_response,
-                    'file_path'         => $filePath,
-                    'file_name'         => $fileName,
+                    'file_path'         => $filePath ?? ($request->hasFile('file') ? null : ($existingSubmission->file_path ?? null)),
+                    'file_name'         => $fileName ?? ($request->hasFile('file') ? null : ($existingSubmission->file_name ?? null)),
                     'review_status'     => 'pending',
                     'mentor_feedback'   => null,
                 ]
@@ -619,6 +663,22 @@ class MilestoneController extends Controller
             $milestone->update(['status' => 'in_progress']);
 
             DB::commit();
+
+            // Kirim notifikasi email ke Mentor penanggung jawab (assigned_mentor_id atau mentor dari booking)
+            try {
+                $mentorId = $user->assigned_mentor_id;
+                if (!$mentorId) {
+                    $mentorId = \App\Models\ConsultationBooking::where('mentee_id', $user->id)->value('mentor_id');
+                }
+                $mentor = $mentorId ? \App\Models\User::find($mentorId) : null;
+
+                if ($mentor && !empty($mentor->email)) {
+                    \Illuminate\Support\Facades\Mail::to($mentor->email)->send(new \App\Mail\TaskResubmittedMentorMail($mentor, $user, $milestone, $submission));
+                    Log::info("📧 Email notifikasi tugas mentee baru/revisi berhasil dikirim ke mentor: {$mentor->email}");
+                }
+            } catch (\Exception $mailEx) {
+                Log::warning("Gagal mengirim email notifikasi tugas ke mentor: " . $mailEx->getMessage());
+            }
 
             return response()->json([
                 'status' => 'success',
@@ -682,6 +742,169 @@ class MilestoneController extends Controller
                 'xp_awarded'        => $submission->xp_awarded,
                 'reviewed_by'       => $submission->reviewer->name ?? null,
                 'reviewed_at'       => $submission->reviewed_at ? $submission->reviewed_at->format('Y-m-d H:i:s') : null,
+            ]
+        ], 200);
+    }
+
+    /**
+     * GET /api/reminders/upcoming atau /api/milestones/upcoming-deadlines
+     * Mengambil daftar tugas, pendaftaran beasiswa, dan action plan mentor dengan tenggat waktu terdekat (misal H-7 s/d H-1 & Hari H).
+     */
+    public function getUpcomingDeadlines(Request $request)
+    {
+        $user = Auth::user();
+
+        // Parameter rentang hari (default 7 hari, misal H-7 sampai H-1 & Hari H)
+        $days = (int) $request->query('days', 7);
+        $days = max(1, min(30, $days)); // Batasi rentang antara 1 hingga 30 hari
+
+        $today = Carbon::now()->startOfDay();
+        $targetEndDate = $today->copy()->addDays($days)->endOfDay();
+
+        $reminders = [];
+        $totalUpcoming = 0;
+        $totalOverdue = 0;
+
+        // ==========================================
+        // 1. CEK TUGAS / MILESTONE USER (UserMilestone)
+        // ==========================================
+        $milestones = UserMilestone::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->whereNull('completed_at')->orWhere('status', '!=', 'completed');
+            })
+            ->whereNotNull('target_date')
+            ->where('target_date', '<=', $targetEndDate)
+            ->orderBy('target_date', 'asc')
+            ->get();
+
+        foreach ($milestones as $m) {
+            $deadline = Carbon::parse($m->target_date)->startOfDay();
+            $diffInDays = (int) $today->diffInDays($deadline, false); // Positif jika mendatang, negatif jika terlewat
+
+            $isOverdue = $diffInDays < 0;
+            if ($isOverdue) {
+                $totalOverdue++;
+                $urgencyLabel = 'Overdue (H+' . abs($diffInDays) . ')';
+            } elseif ($diffInDays === 0) {
+                $totalUpcoming++;
+                $urgencyLabel = 'Hari H';
+            } else {
+                $totalUpcoming++;
+                $urgencyLabel = 'H-' . $diffInDays;
+            }
+
+            $reminders[] = [
+                'id'             => $m->id,
+                'type'           => 'milestone',
+                'category_label' => 'Tugas Milestone',
+                'title'          => $m->task_name,
+                'description'    => $m->description,
+                'deadline'       => $deadline->format('Y-m-d'),
+                'days_remaining' => $diffInDays,
+                'urgency_status' => $urgencyLabel,
+                'status'         => $m->status,
+                'is_overdue'     => $isOverdue,
+            ];
+        }
+
+        // ==========================================
+        // 2. CEK TENGGAT BEASISWA TARGET (Scholarship)
+        // ==========================================
+        $userScholarships = DB::table('user_scholarships')
+            ->join('scholarships', 'user_scholarships.scholarship_id', '=', 'scholarships.id')
+            ->where('user_scholarships.user_id', $user->id)
+            ->whereNotNull('scholarships.deadline_date')
+            ->select('scholarships.id', 'scholarships.name', 'scholarships.provider_country', 'scholarships.deadline_date', 'scholarships.funding_type')
+            ->get();
+
+        foreach ($userScholarships as $sch) {
+            $deadline = Carbon::parse($sch->deadline_date)->startOfDay();
+            if ($deadline->lessThanOrEqualTo($targetEndDate)) {
+                $diffInDays = (int) $today->diffInDays($deadline, false);
+                $isOverdue = $diffInDays < 0;
+
+                if ($isOverdue) {
+                    $totalOverdue++;
+                    $urgencyLabel = 'Overdue (H+' . abs($diffInDays) . ')';
+                } elseif ($diffInDays === 0) {
+                    $totalUpcoming++;
+                    $urgencyLabel = 'Hari H (Penutupan)';
+                } else {
+                    $totalUpcoming++;
+                    $urgencyLabel = 'H-' . $diffInDays;
+                }
+
+                $reminders[] = [
+                    'id'             => $sch->id,
+                    'type'           => 'scholarship',
+                    'category_label' => 'Pendaftaran Beasiswa',
+                    'title'          => $sch->name,
+                    'description'    => 'Penutupan Beasiswa ' . $sch->name . ' (' . ($sch->provider_country ?? 'Internasional') . ')',
+                    'deadline'       => $deadline->format('Y-m-d'),
+                    'days_remaining' => $diffInDays,
+                    'urgency_status' => $urgencyLabel,
+                    'status'         => $isOverdue ? 'closed' : 'open',
+                    'is_overdue'     => $isOverdue,
+                ];
+            }
+        }
+
+        // ==========================================
+        // 3. CEK ACTION PLAN MENTOR (ActionPlan)
+        // ==========================================
+        if (class_exists(\App\Models\ActionPlan::class)) {
+            $actionPlans = \App\Models\ActionPlan::where('mentee_id', $user->id)
+                ->where('is_completed', false)
+                ->whereNotNull('deadline')
+                ->where('deadline', '<=', $targetEndDate)
+                ->get();
+
+            foreach ($actionPlans as $ap) {
+                $deadline = Carbon::parse($ap->deadline)->startOfDay();
+                $diffInDays = (int) $today->diffInDays($deadline, false);
+                $isOverdue = $diffInDays < 0;
+
+                if ($isOverdue) {
+                    $totalOverdue++;
+                    $urgencyLabel = 'Overdue (H+' . abs($diffInDays) . ')';
+                } elseif ($diffInDays === 0) {
+                    $totalUpcoming++;
+                    $urgencyLabel = 'Hari H';
+                } else {
+                    $totalUpcoming++;
+                    $urgencyLabel = 'H-' . $diffInDays;
+                }
+
+                $reminders[] = [
+                    'id'             => $ap->id,
+                    'type'           => 'action_plan',
+                    'category_label' => 'Tugas Tambahan Mentor',
+                    'title'          => $ap->task_title ?? 'Tugas Mentor',
+                    'description'    => $ap->task_description ?? $ap->mentor_note,
+                    'deadline'       => $deadline->format('Y-m-d'),
+                    'days_remaining' => $diffInDays,
+                    'urgency_status' => $urgencyLabel,
+                    'status'         => 'pending',
+                    'is_overdue'     => $isOverdue,
+                ];
+            }
+        }
+
+        // Urutkan pengingat berdasarkan days_remaining terkecil (overdue dulu, lalu Hari H, lalu H-1 dst.)
+        usort($reminders, function ($a, $b) {
+            return $a['days_remaining'] <=> $b['days_remaining'];
+        });
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Daftar pengingat tenggat waktu terdekat berhasil diambil.',
+            'data'    => [
+                'summary' => [
+                    'total_upcoming' => $totalUpcoming,
+                    'total_overdue'  => $totalOverdue,
+                    'days_window'    => $days,
+                ],
+                'reminders' => $reminders
             ]
         ], 200);
     }

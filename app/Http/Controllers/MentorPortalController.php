@@ -18,6 +18,7 @@ use App\Models\UserMilestone;
 use App\Models\MilestoneSubmission;
 use App\Models\DocumentVault;
 use App\Models\SessionReview; 
+use App\Services\GamificationService; 
 
 class MentorPortalController extends Controller
 {
@@ -32,10 +33,10 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
-        // 1. Total Mentee Unik yang ditangani
-        $totalMentees = ConsultationBooking::where('mentor_id', $mentor->id)
-            ->distinct('mentee_id')
-            ->count('mentee_id');
+        // 1. Total Mentee Unik yang ditangani (baik dari assigned_mentor_id maupun booking)
+        $assignedMenteeIds = User::where('assigned_mentor_id', $mentor->id)->pluck('id')->toArray();
+        $bookedMenteeIds   = ConsultationBooking::where('mentor_id', $mentor->id)->pluck('mentee_id')->toArray();
+        $totalMentees = count(array_unique(array_merge($assignedMenteeIds, $bookedMenteeIds)));
 
         // 2. Total Sesi Selesai
         $completedSessions = ConsultationBooking::where('mentor_id', $mentor->id)
@@ -133,9 +134,10 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
-        $menteeIds = ConsultationBooking::where('mentor_id', $mentor->id)
-            ->pluck('mentee_id')
-            ->unique();
+        // Ambil mentee yang di-assign langsung via AI Matcher/profile (assigned_mentor_id) DAN yang melakukan booking sesi
+        $assignedMenteeIds = User::where('assigned_mentor_id', $mentor->id)->pluck('id')->toArray();
+        $bookedMenteeIds   = ConsultationBooking::where('mentor_id', $mentor->id)->pluck('mentee_id')->toArray();
+        $menteeIds         = array_values(array_unique(array_merge($assignedMenteeIds, $bookedMenteeIds)));
 
         $mentees = User::whereIn('id', $menteeIds)
             ->with(['milestones', 'documents', 'scholarships']) 
@@ -910,12 +912,12 @@ class MentorPortalController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
         }
 
-        // Ambil mentee ID yang bimbingan dengan mentor ini
-        $menteeIds = ConsultationBooking::where('mentor_id', $mentor->id)
-            ->pluck('mentee_id')
-            ->unique();
+        // Ambil mentee ID yang di-assign langsung via AI Matcher (assigned_mentor_id) DAN dari booking sesi
+        $assignedMenteeIds = User::where('assigned_mentor_id', $mentor->id)->pluck('id')->toArray();
+        $bookedMenteeIds   = ConsultationBooking::where('mentor_id', $mentor->id)->pluck('mentee_id')->toArray();
+        $menteeIds         = array_values(array_unique(array_merge($assignedMenteeIds, $bookedMenteeIds)));
 
-        $query = MilestoneSubmission::with(['milestone', 'user:id,name,email,profile_picture', 'documentVault']);
+        $query = MilestoneSubmission::with(['milestone', 'user:id,name,email,profile_picture_url', 'documentVault']);
 
         if ($mentor->role !== 'admin') {
             $query->whereIn('user_id', $menteeIds);
@@ -1043,6 +1045,16 @@ class MentorPortalController extends Controller
 
                 DB::commit();
 
+                // Kirim email kelulusan/persetujuan tugas ke mentee
+                try {
+                    if ($mentee && !empty($mentee->email)) {
+                        Mail::to($mentee->email)->send(new \App\Mail\SubmissionApprovedMail($mentee, $milestone, $request->feedback ?? '', $mentor->name, $xpReward));
+                        Log::info("📧 Email notifikasi tugas DISETUJUI berhasil dikirim ke mentee: {$mentee->email}");
+                    }
+                } catch (\Exception $mailEx) {
+                    Log::warning("Gagal mengirim email persetujuan ke mentee: " . $mailEx->getMessage());
+                }
+
                 return response()->json([
                     'status' => 'success',
                     'message' => "Tugas mentee '{$milestone->task_name}' DISETUJUI! Mentee mendapatkan {$xpReward} XP dan feedback telah dikirim.",
@@ -1069,6 +1081,16 @@ class MentorPortalController extends Controller
                 $milestone->update(['status' => 'in_progress']);
 
                 DB::commit();
+
+                // Kirim notifikasi email permintaan revisi ke mentee
+                try {
+                    if ($mentee && !empty($mentee->email)) {
+                        Mail::to($mentee->email)->send(new \App\Mail\SubmissionRevisionRequestedMail($mentee, $milestone, $request->feedback, $mentor->name));
+                        Log::info("📧 Email notifikasi revisi berhasil dikirim ke mentee: {$mentee->email}");
+                    }
+                } catch (\Exception $mailEx) {
+                    Log::warning("Gagal mengirim email notifikasi revisi ke mentee: " . $mailEx->getMessage());
+                }
 
                 return response()->json([
                     'status' => 'success',
@@ -1202,7 +1224,7 @@ class MentorPortalController extends Controller
             ->get();
 
         // Cari ActionPlan records yang terhubung ke mentee
-        $actionPlans = ActionPlan::with('booking.mentor:id,name,email,profile_picture')
+        $actionPlans = ActionPlan::with('booking.mentor:id,name,email,profile_picture_url')
             ->where('mentee_id', $parentMilestone->user_id)
             ->get();
 

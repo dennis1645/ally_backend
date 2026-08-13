@@ -90,7 +90,7 @@ class EssayAssessmentController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            $statusCode = in_array($e->getCode(), [400, 402, 422, 429]) ? $e->getCode() : 500;
+            $statusCode = in_array($e->getCode(), [400, 402, 422, 429, 503]) ? $e->getCode() : 500;
             return response()->json([
                 'status'  => 'error',
                 'message' => $e->getMessage()

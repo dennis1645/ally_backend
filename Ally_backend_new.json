@@ -1805,6 +1805,33 @@
                 "description": "Menandai tugas Action Plan buatan mentor sebagai selesai (is_completed: true), otomatis menyelesaikan task di user_milestones, menambah XP mentee, dan memperbarui readiness score."
               },
               "response": []
+            },
+            {
+              "name": "Cek Pengingat Tenggat Waktu Terdekat (Smart Reminders)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/reminders/upcoming?days=7",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "reminders",
+                    "upcoming"
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "7",
+                      "description": "Rentang hari mendatang (misal 7 hari untuk H-7 s/d Hari H)"
+                    }
+                  ]
+                },
+                "description": "Mengambil daftar pengingat tenggat waktu terdekat (Tugas Milestone, Penutupan Beasiswa, dan Task Mentor) yang diurutkan berdasarkan prioritas urgensi."
+              },
+              "response": []
             }
           ]
         },

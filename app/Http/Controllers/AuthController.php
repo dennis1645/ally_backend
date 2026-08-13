@@ -222,7 +222,7 @@ class AuthController extends Controller
             $cookie = cookie(
                 'auth_token', 
                 $token, 
-                60 * 24 * 7, // Kadaluarsa dalam 7 hari (dalam menit)
+                60 * 24, // Kadaluarsa dalam 24 jam / 1 hari (dalam menit)
                 '/', 
                 null, 
                 env('APP_ENV') !== 'local', // Secure flag aktif jika bukan di environment local
@@ -275,7 +275,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
         
         // Setup HTTP-Only Cookie setelah berhasil verifikasi dan login otomatis
-        $cookie = cookie('auth_token', $token, 60 * 24 * 7, '/', null, env('APP_ENV') !== 'local', true, false, 'Strict');
+        $cookie = cookie('auth_token', $token, 60 * 24, '/', null, env('APP_ENV') !== 'local', true, false, 'Strict');
 
         return redirect()->away($redirectUrl . '?token=' . $token . '&verified=true')->withCookie($cookie);
     }
@@ -331,7 +331,7 @@ class AuthController extends Controller
         $cookie = cookie(
             'auth_token', 
             $token, 
-            60 * 24 * 7, // 7 hari
+            60 * 24, // 24 jam / 1 hari
             '/', 
             null, 
             env('APP_ENV') !== 'local', // Secure flag (Hanya https jika bukan local)

@@ -159,6 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User Milestone & AI Timeline Routes
     Route::prefix('milestones')->group(function () {
+        Route::get('/upcoming-deadlines', [MilestoneController::class, 'getUpcomingDeadlines']);
         Route::get('/', [MilestoneController::class, 'getTimeline']);
         Route::post('/generate', [MilestoneController::class, 'generateTimeline']);
         Route::patch('/{id}/in-progress', [MilestoneController::class, 'startTask']); 
@@ -167,6 +168,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/submit', [MilestoneController::class, 'submitTask']);
         Route::get('/{id}/submission', [MilestoneController::class, 'getTaskSubmission']);
         Route::get('/{parentMilestoneId}/action-plans', [MentorPortalController::class, 'getActionPlansByParent']);
+    });
+
+    // Reminders & Upcoming Deadlines (Untuk Konsumsi Dashboard Frontend)
+    Route::prefix('reminders')->group(function () {
+        Route::get('/upcoming', [MilestoneController::class, 'getUpcomingDeadlines']);
     });
 
     // Action Plans Management
