@@ -31,25 +31,35 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         });
 
         Telescope::tag(function (IncomingEntry $entry) {
-            $tags = [];
+            return Telescope::withoutRecording(function () use ($entry) {
+                $tags = [];
 
-            $ip = request()->header('X-Forwarded-For') ?? request()->ip() ?? '127.0.0.1';
-            $tags[] = 'IP:' . $ip;
+                $ip = request()->header('X-Forwarded-For') ?? request()->ip() ?? '127.0.0.1';
+                $tags[] = 'IP:' . $ip;
 
-            $user = request()->user() ?? (auth('web')->user() ?? null);
-            if ($user && !empty($user->email)) {
-                $tags[] = 'User:' . $user->email;
-                $tags[] = 'Role:' . ($user->role ?? 'user');
-            }
-
-            if ($entry->type === 'request') {
-                $status = $entry->content['response_status'] ?? null;
-                if ($status) {
-                    $tags[] = 'Status:' . $status;
+                if (\Illuminate\Support\Facades\Auth::guard('web')->check()) {
+                    $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
+                    if ($user && !empty($user->email)) {
+                        $tags[] = 'User:' . $user->email;
+                        $tags[] = 'Role:' . ($user->role ?? 'user');
+                    }
+                } elseif (\Illuminate\Support\Facades\Auth::guard('sanctum')->check()) {
+                    $user = \Illuminate\Support\Facades\Auth::guard('sanctum')->user();
+                    if ($user && !empty($user->email)) {
+                        $tags[] = 'User:' . $user->email;
+                        $tags[] = 'Role:' . ($user->role ?? 'user');
+                    }
                 }
-            }
 
-            return array_unique($tags);
+                if ($entry->type === 'request') {
+                    $status = $entry->content['response_status'] ?? null;
+                    if ($status) {
+                        $tags[] = 'Status:' . $status;
+                    }
+                }
+
+                return array_unique($tags);
+            });
         });
     }
 
