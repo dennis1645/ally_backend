@@ -17,7 +17,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"phone_number\": \"081234267821\",\r\n    \"password\": \"StrongPassword123!\",\r\n    \"password_confirmation\": \"StrongPassword123!\",\r\n    \"guest_token\": \"token-unik-worstcase-initial-001\" \r\n}",
+              "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"phone_number\": \"081234267821\",\r\n    \"password\": \"{{default_password}}\",\r\n    \"password_confirmation\": \"{{default_password}}\",\r\n    \"guest_token\": \"token-unik-worstcase-initial-001\" \r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -44,7 +44,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"email\": \"khalisa.mentor@gmail.com\",\r\n    \"password\": \"P@ssw0rd123\"\r\n}",
+              "raw": "{\r\n    \"email\": \"khalisa.mentor@gmail.com\",\r\n    \"password\": \"{{default_password}}\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -71,7 +71,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"password\": \"StrongPassword123!\"\r\n}",
+              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"password\": \"{{default_password}}\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -98,7 +98,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"email\": \"juna.admin@gmail.com\",\r\n    \"password\": \"P@ssw0rd123\"\r\n}",
+              "raw": "{\r\n    \"email\": \"juna.admin@gmail.com\",\r\n    \"password\": \"{{default_password}}\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -179,7 +179,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"token\": \"c9a58601560d570713bd6de071054c9cc1e874954ae16c9ecb8a62887eea381c\",\r\n    \"password\": \"PasswordBaru123!\",\r\n    \"password_confirmation\": \"PasswordBaru123!\"\r\n}",
+              "raw": "{\r\n    \"email\": \"dennissatrianisp.dev@gmail.com\",\r\n    \"token\": \"{{sample_reset_token}}\",\r\n    \"password\": \"{{default_password}}\",\r\n    \"password_confirmation\": \"{{default_password}}\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -317,7 +317,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"current_password\": \"PasswordBaru123!\",\r\n    \"password\": \"PasswordBaru456@\",\r\n    \"password_confirmation\": \"PasswordBaru456@\"\r\n}",
+              "raw": "{\r\n    \"current_password\": \"{{default_password}}\",\r\n    \"password\": \"{{default_password}}\",\r\n    \"password_confirmation\": \"{{default_password}}\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -419,7 +419,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"sicsmanda12@gmail.com\",\r\n    \"phone_number\": \"081199498888\",\r\n    \"gender\": \"male\",\r\n    \"role\": \"mentor\",\r\n    \"password\": \"PasswordKuat123!\",\r\n    \"is_premium\": false\r\n}",
+                  "raw": "{\r\n    \"name\": \"Budi Santoso\",\r\n    \"email\": \"sicsmanda12@gmail.com\",\r\n    \"phone_number\": \"081199498888\",\r\n    \"gender\": \"male\",\r\n    \"role\": \"mentor\",\r\n    \"password\": \"{{default_password}}\",\r\n    \"is_premium\": false\r\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -476,7 +476,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\r\n    \"password\": \"NewPassword123@\",\r\n    \"password_confirmation\": \"NewPassword123@\"\r\n}",
+                  "raw": "{\r\n    \"password\": \"{{default_password}}\",\r\n    \"password_confirmation\": \"{{default_password}}\"\r\n}",
                   "options": {
                     "raw": {
                       "language": "json"

@@ -11,8 +11,9 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Password default yang memenuhi syarat sistem (Minimal 8 karakter, huruf besar & kecil, angka, dan simbol)
-        $defaultPassword = Hash::make('P@ssw0rd123');
+        // Password default yang dibaca dari file .env (Atau fallback acak yang aman)
+        $plainPassword = env('SEEDER_DEFAULT_PASSWORD', 'DefaultPass2026!');
+        $defaultPassword = Hash::make($plainPassword);
 
         // ==========================================
         // 1 AKUN ADMIN
