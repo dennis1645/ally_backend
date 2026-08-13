@@ -106,6 +106,37 @@ class MentorBookingController extends Controller
                 ], 402); 
             }
 
+            // =========================================================
+            // 1. CEK ANTI-SPAM: MAKSIMAL 1 KALI BOOKING PER HARI
+            // =========================================================
+            $todayBookingCount = ConsultationBooking::where('mentee_id', $mentee->id)
+                ->whereDate('created_at', now()->toDateString())
+                ->count();
+
+            if ($todayBookingCount >= 1) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda telah melakukan booking sesi konsultasi hari ini. Batas maksimal booking adalah 1 kali per hari. Silakan coba kembali besok.'
+                ], 400);
+            }
+
+            // =========================================================
+            // 2. CEK ANTI-SPAM: MAKSIMAL 3 KALI BOOKING DALAM SEMINGGU
+            // =========================================================
+            $startOfWeek = now()->startOfWeek();
+            $weeklyBookingCount = ConsultationBooking::where('mentee_id', $mentee->id)
+                ->where('created_at', '>=', $startOfWeek)
+                ->count();
+
+            if ($weeklyBookingCount >= 3) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Anda telah mencapai batas maksimal 3 kali booking konsultasi minggu ini. Pendaftaran sesi konsultasi baru dapat dilakukan minggu depan.'
+                ], 400);
+            }
+
             $availability = MentorAvailability::with('mentor')
                 ->where('id', $request->availability_id)
                 ->lockForUpdate()
@@ -120,6 +151,21 @@ class MentorBookingController extends Controller
             }
 
             $mentor = $availability->mentor;
+
+            // =========================================================
+            // 3. CEK KAPASITAS MENTOR: MAKSIMAL 5 MENTEE PER MENTOR
+            // =========================================================
+            $assignedIds = User::where('assigned_mentor_id', $mentor->id)->pluck('id')->toArray();
+            $bookedIds   = ConsultationBooking::where('mentor_id', $mentor->id)->pluck('mentee_id')->toArray();
+            $currentMenteeIds = array_unique(array_merge($assignedIds, $bookedIds));
+
+            if (count($currentMenteeIds) >= 5 && !in_array($mentee->id, $currentMenteeIds)) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Maaf, mentor ini telah mencapai kuota maksimal 5 mentee. Silakan pilih mentor lain.'
+                ], 400);
+            }
 
             // =========================================================
             // PERBAIKAN: Menyimpan 'mentor_earned_fee' saat booking

@@ -24,6 +24,11 @@ class AddAuthTokenHeader
             $request->headers->set('Authorization', 'Bearer ' . $token);
         }
 
+        // Catat log otomatis IP & endpoint untuk pemantauan Telescope
+        if ($request->is('api/*')) {
+            \Illuminate\Support\Facades\Log::info("🌐 API Request [{$request->ip()}] - {$request->method()} {$request->fullUrl()}");
+        }
+
         return $next($request);
     }
 }

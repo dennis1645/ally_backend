@@ -43,13 +43,13 @@ class SendSmartNudgeReminders extends Command
             })
             ->where(function($q) use ($datesList) {
                 foreach ($datesList as $date) {
-                    $q->orWhereDate('target_deadline', $date);
+                    $q->orWhereDate('target_date', $date);
                 }
             })
             ->get();
         
         $this->info("🔍 [UserMilestone] Ditemukan: " . $milestones->count() . " data.");
-        $this->processNotification($milestones, 'target_deadline', 'task_name', 'Milestone/Task', $targetDates);
+        $this->processNotification($milestones, 'target_date', 'task_name', 'Milestone/Task', $targetDates);
 
         // ==========================================
         // 2. Proses Deadline Beasiswa

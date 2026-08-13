@@ -31,17 +31,25 @@ class MentorMatchingController extends Controller
 
         $assignedMentorData = null;
 
-        // Otomatis assign mentor teratas (1st match) ke assigned_mentor_id user yang sedang login
+        // Otomatis assign mentor teratas (1st match) yang belum mencapai kuota 5 mentee
         if ($user && !empty($matchedMentors)) {
-            $topMentor = $matchedMentors[0];
-            $topLocalMentorId = $topMentor['local_mentor_id'] ?? null;
+            foreach ($matchedMentors as $mentorCandidate) {
+                $candidateId = $mentorCandidate['local_mentor_id'] ?? null;
+                if ($candidateId) {
+                    $assignedIds = User::where('assigned_mentor_id', $candidateId)->pluck('id')->toArray();
+                    $bookedIds   = \App\Models\ConsultationBooking::where('mentor_id', $candidateId)->pluck('mentee_id')->toArray();
+                    $uniqueMenteeCount = count(array_unique(array_merge($assignedIds, $bookedIds)));
 
-            if ($topLocalMentorId) {
-                $user->update([
-                    'assigned_mentor_id' => $topLocalMentorId
-                ]);
+                    // Jika kandidat ini adalah mentor mentee saat ini OR jumlah menteenya < 5
+                    if ($user->assigned_mentor_id == $candidateId || $uniqueMenteeCount < 5) {
+                        $user->update([
+                            'assigned_mentor_id' => $candidateId
+                        ]);
 
-                $assignedMentorData = User::with('mentorProfile')->find($topLocalMentorId);
+                        $assignedMentorData = User::with('mentorProfile')->find($candidateId);
+                        break;
+                    }
+                }
             }
         }
 
