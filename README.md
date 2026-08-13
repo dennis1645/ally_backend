@@ -9,20 +9,27 @@
 
 **ALLY** is a state-of-the-art AI-powered mentorship and scholarship acceleration platform designed to empower ASEAN students to secure global higher-education scholarships (e.g., LPDP, Chevening, MEXT, KGSP, AAS, FulBright).
 
-The **ALLY Backend** is built on top of Laravel 11/13, utilizing RESTful APIs, Llama 3.2 AI microservices, Google Gemini API, Midtrans Payment Gateway, encrypted Document Vault, Sanctum authentication, and automated gamification systems.
+The **ALLY Backend** is built on top of Laravel 11/13, utilizing RESTful APIs, Llama 3.2 AI microservices, Google Gemini API, Midtrans Payment Gateway, encrypted Document Vault, Sanctum authentication with 24-hour token expiration, and automated gamification systems.
 
 ---
 
 ## 🔥 Key Technical Highlights & Architecture
 
-- **AI Microservice Integration**: Connected to Llama 3.2 microservices (`LLAMA_API_URL`) for **Initial Diagnostic**, **Deep Diagnostic & Scholarship Matching**, **AI Mentor Recommendation**, and **OCR Essay Assessment**.
+- **AI Microservice Integration**: Connected to Llama 3.2 microservices (`LLAMA_API_URL`) for **Initial Diagnostic**, **Deep Diagnostic & Scholarship Matching**, **AI Mentor Recommendation**, and **OCR Essay & Document Assessment**.
+- **Bidirectional Task Translator Layer**: Native bidirectional translator mapping string AI `taskId`s (`application-cv`, `application-transcript`, `application-recommendation`, `essay-motivation`, `essay-university`, `essay-star-story`, `essay-impact`) and numeric database milestone IDs.
+- **AI OCR Essay & Document Assessment**: Single locked endpoint (`POST /api/journey/task/upload` or `/api/essay/assess`) evaluating essays across 6 categories (`storytelling`, `motivation`, `leadership`, `impact`, `scholarship_alignment`, `clarity`) and verifying application documents (`cv`, `transcript`, `recommendation`). Deducts 1 Token per review, auto-completes milestones if `score >= 70` or `completed: true`, and returns HTTP 422 AI validation warnings with 0 token deduction.
+- **AI Offline Protection & 503 Error Handling**: In case of Ngrok tunnel offline (`ERR_NGROK_3200`) or service unavailability, local dummy fallbacks are disabled to protect data integrity, returning clean HTTP 503 error messages to the user without deducting tokens or saving fake records.
+- **Smart Reminders & Upcoming Deadlines API**: `GET /api/reminders/upcoming` endpoint querying upcoming milestone deadlines, scholarship closing dates, and mentor action plans within customizable window (`?days=7`). Returns urgency status (`H-7`, `H-1`, `Hari H`, `Overdue`).
+- **Automated Email Notification System**:
+  - **Email Verification & Password Reset**: Segoe UI gradient design system.
+  - **Task Review Lifecycle**: Automated emails for task approval (`SubmissionApprovedMail`), revision request with mentor notes (`SubmissionRevisionRequestedMail`), and mentee re-submission (`TaskResubmittedMentorMail`).
+  - **AI Mentor Matcher Credentials**: Automatically emails login credentials (`MentorCredentialMail`) with temporary password (`P@ssw0rd123`) to newly generated AI mentors.
+  - **Daily Smart Nudge Scheduler**: Scheduled command (`php artisan nudge:send-reminders`) running daily at 07:00 to remind users of approaching deadlines (H-3, H-1, Hari H) and trigger H+1 Overdue Freeze Streak.
+- **Auto Storage Clean-up on Task Re-submission**: When mentees re-submit a revised task with a new file, old physical files in storage and old `DocumentVault` records are automatically purged to prevent disk clutter.
 - **Google Gemini API Chatbot**: Intelligent AI Mentor Chatbot (`POST /api/ai-mentor/chat`) injected with full mentee context (profile, GPA, readiness score, document vault status, and timeline progress).
-- **AI OCR Essay Assessment (6 Valley Categories)**: Evaluates essays across 6 categories (`storytelling`, `motivation`, `leadership`, `impact`, `scholarship_alignment`, `clarity`). Supports physical file uploads (PDF, DOCX, TXT), enforces a daily limit of 3 reviews/day, deducts 1 Token per review, and auto-completes milestone tasks if `score >= 70`.
 - **Encrypted Document Vault**: AES-256 encrypted document vault for confidential documents (LoA, IELTS certificates, recommendation letters) with signed URL preview capabilities.
-- **Bulk Calendar & Action Plan Management**: Enables mentors to create bulk calendar availabilities and issue branching post-session action plans tied to parent milestones.
-- **Instant Reschedule Flow**: Instant mentor rescheduling with automatic mentee dashboard modal pop-ups and automated email notifications.
-- **Gamification Engine**: Automatic XP calculations, badge awards, level progression, and dynamic readiness score updates.
-- **Role-Based Access Control (RBAC)**: Sanctum-authenticated endpoints with `user` (mentee), `mentor`, and `admin` scopes.
+- **Multi-Mentee Dashboard**: Automatically combines both directly assigned mentees (`assigned_mentor_id`) and consultation booking mentees into mentor dashboard (`GET /api/mentor/mentees` & `GET /api/mentor/submissions`).
+- **Session Management & Security**: 24-hour token expiration (`config/sanctum.php`), HTTP-Only Cookie (`SameSite: Strict`, XSS & CSRF protection), rate limiting (max 3 login attempts), and strict password rules.
 
 ---
 
@@ -30,11 +37,11 @@ The **ALLY Backend** is built on top of Laravel 11/13, utilizing RESTful APIs, L
 
 - **Framework**: Laravel 11 / 13 (PHP 8.2+)
 - **Database**: MySQL 8.0+
-- **Authentication**: Laravel Sanctum (Token-based & Guest Session handling)
+- **Authentication**: Laravel Sanctum (24-Hour Token Expiration, Bearer Token & HTTP-Only Cookie)
 - **Payment Gateway**: Midtrans Snap API & Public Webhook Handler
-- **AI Integrations**: Llama 3.2 Microservice (via HTTP Client & Multipart Attachments) & Google Gemini API
-- **Mail Service**: Laravel Mailer (SMTP / Mailtrap)
-- **Testing & Tooling**: PHPUnit & Artisan Tinkering
+- **AI Integrations**: Llama 3.2 Microservice & Google Gemini API
+- **Mail Service**: Laravel Mailer (SMTP / Mailtrap) with HTML Blade Templates
+- **Scheduler**: Laravel Console Scheduler (Daily Smart Nudge Cron)
 
 ---
 
@@ -45,7 +52,6 @@ Ensure your environment meets the following requirements:
 - PHP >= 8.2 with extensions: `OpenSSL`, `PDO`, `Mbstring`, `Tokenizer`, `XML`, `Ctype`, `JSON`, `cURL`
 - Composer 2.x
 - MySQL Server 8.0+
-- Node.js & NPM (optional, for asset building)
 
 ### 2. Clone Repository & Install Dependencies
 ```bash
@@ -112,15 +118,16 @@ php artisan storage:link
 
 ### 5. Database Migration & Seeding
 ```bash
-# Run database migrations
-php artisan migrate
-
-# (Optional) Seed default scholarships, diagnostic questions, and badges
-php artisan db:seed
+# Run database migrations and seed default data (Scholarships, Users, Badges, Shop Items, Smart Nudge Simulation)
+php artisan migrate:fresh --seed
 ```
 
-### 6. Run Local Development Server
+### 6. Useful Artisan Commands
 ```bash
+# Run Smart Nudge Reminders manually
+php artisan nudge:send-reminders
+
+# Run local development server
 php artisan serve
 ```
 The API will be available at `http://127.0.0.1:8000`.
@@ -133,8 +140,8 @@ The API will be available at `http://127.0.0.1:8000`.
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `POST` | `/api/register` | Register new user or claim guest onboarding token | Public |
-| `POST` | `/api/login` | Login user/mentor/admin and return Bearer Token | Public |
-| `POST` | `/api/logout` | Revoke current access token | Bearer Token |
+| `POST` | `/api/login` | Login user/mentor/admin and return Bearer Token + 24-hr Cookie | Public |
+| `POST` | `/api/logout` | Revoke current access token and clear auth cookie | Bearer Token |
 | `POST` | `/api/forgot-password` | Request password reset token via email | Public |
 | `POST` | `/api/reset-password` | Reset password using token | Public |
 | `POST` | `/api/change-password` | Change password from authenticated profile | Bearer Token |
@@ -163,19 +170,28 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 📝 4. AI OCR Essay Assessment — 6 Valley Categories (`/api/essay`)
+### 📝 4. AI OCR Essay & Document Assessment (`/api/essay` & `/api/journey`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `POST` | `/api/essay/assess` | Submit PDF/DOCX/TXT file or essay text for AI OCR assessment (1 Token cost, max 3/day) | Bearer Token |
+| `POST` | `/api/journey/task/upload` | Main upload endpoint for essay or document milestone task evaluation | Bearer Token |
+| `POST` | `/api/essay/assess` | Submit PDF/DOCX/TXT file or essay text for AI OCR assessment (1 Token cost) | Bearer Token |
 | `GET` | `/api/essay/history` | List user's essay assessment history, token balance & remaining daily quota | Bearer Token |
 | `GET` | `/api/essay/{id}` | Get detailed essay assessment result (score, categories, strengths, weaknesses) | Bearer Token |
 
 ---
 
-### 🤝 5. AI Mentor Matching & Booking Flow (`/api`)
+### ⏰ 5. Smart Reminders & Upcoming Deadlines (`/api/reminders`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `POST` | `/api/mentor/match` | AI Match Mentors, auto-sync local DB, and auto-assign top mentor | Bearer Token |
+| `GET` | `/api/reminders/upcoming` | Query upcoming milestone deadlines, scholarship closing dates, and mentor tasks (`?days=7`) | Bearer Token |
+| `GET` | `/api/milestones/upcoming-deadlines` | Alias endpoint for upcoming deadline reminders dashboard widget | Bearer Token |
+
+---
+
+### 🤝 6. AI Mentor Matching & Booking Flow (`/api`)
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `POST` | `/api/mentor/match` | AI Match Mentors, auto-sync local DB, auto-assign top mentor, and send credential email | Bearer Token |
 | `POST` | `/api/mentor/book` | Book consultation session using mentor availability slot | Bearer Token |
 | `GET` | `/api/my-bookings` | List user's consultation booking history | Bearer Token |
 | `GET` | `/api/my-bookings/reschedule-popups` | Get active reschedule notifications for mentee dashboard modal | Bearer Token |
@@ -184,24 +200,24 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 🗺️ 6. AI Timeline Milestones & Mentor Action Plans (`/api`)
+### 🗺️ 7. AI Timeline Milestones & Mentor Action Plans (`/api`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `POST` | `/api/milestones/generate` | Generate personalized AI timeline for selected target scholarship | Bearer Token |
 | `GET` | `/api/milestones` | Get mentee's active milestone roadmap | Bearer Token |
 | `PATCH` | `/api/milestones/{id}/complete` | Complete milestone task, award XP points & update readiness score | Bearer Token |
-| `POST` | `/api/milestones/{id}/submit` | Submit milestone task answer with text & document (saved to Vault) | Bearer Token |
+| `POST` | `/api/milestones/{id}/submit` | Submit/re-submit milestone task answer with text & document (saved to Vault, auto-purges old file) | Bearer Token |
 | `GET` | `/api/milestones/{id}/submission` | View milestone submission status and mentor feedback notes | Bearer Token |
 | `GET` | `/api/action-plans/parent/{parentMilestoneId}` | Get branching mentor action plans under parent milestone | Bearer Token |
 | `PATCH` | `/api/action-plans/{id}/complete` | Mark mentor action plan completed, update parent milestone & XP | Bearer Token |
 
 ---
 
-### 💼 7. Mentor Portal (`/api/mentor`)
+### 💼 8. Mentor Portal (`/api/mentor`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `GET` | `/api/mentor/mentees` | List all assigned mentees in multi-mentee dashboard | Mentor Scope |
-| `GET` | `/api/mentor/dossier/{menteeId}` | Get mentee pre-session dossier (GPA, Readiness, Vault status, Milestones) | Mentor Scope |
+| `GET` | `/api/mentor/mentees` | List all assigned mentees (combines `assigned_mentor_id` and booking mentees) | Mentor Scope |
+| `GET` | `/api/mentor/dossier/{bookingId}` | Get mentee pre-session dossier (GPA, Readiness, Vault status, Milestones) | Mentor Scope |
 | `GET` | `/api/mentor/availabilities` | View mentor's availability calendar slots | Mentor Scope |
 | `POST` | `/api/mentor/availabilities` | Store single or bulk batch availability calendar slots | Mentor Scope |
 | `POST` | `/api/mentor/bookings/{id}/action-plans` | Assign single/bulk branching action plans to mentee post-session | Mentor Scope |
@@ -209,8 +225,8 @@ The API will be available at `http://127.0.0.1:8000`.
 | `PATCH` | `/api/mentor/bookings/{id}/reject` | Reject booking request with reason | Mentor Scope |
 | `PATCH` | `/api/mentor/bookings/{id}/reschedule` | Instant reschedule consultation with mentee dashboard pop-up & email | Mentor Scope |
 | `POST` | `/api/mentor/bookings/{id}/complete` | Complete session & upload session proof photo (Max 5MB) | Mentor Scope |
-| `GET` | `/api/mentor/submissions` | View mentee submission queue for review | Mentor Scope |
-| `POST` | `/api/mentor/submissions/{id}/review` | Review mentee task submission (Approve / Request Revision) | Mentor Scope |
+| `GET` | `/api/mentor/submissions` | View mentee submission queue for audit & review | Mentor Scope |
+| `POST` | `/api/mentor/submissions/{id}/review` | Review mentee task submission (Approve / Request Revision + Email Mentee) | Mentor Scope |
 | `GET` | `/api/mentor/dashboard/stats` | View mentor earnings, total sessions & mentee count stats | Mentor Scope |
 | `GET` | `/api/mentor/invoices` | View mentor income payouts and invoice history | Mentor Scope |
 | `GET` | `/api/mentor/documents` | Get shared mentor documents | Mentor Scope |
@@ -219,14 +235,14 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 🤖 8. Chatbot Mentor AI — Google Gemini (`/api/ai-mentor`)
+### 🤖 9. Chatbot Mentor AI — Google Gemini (`/api/ai-mentor`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `POST` | `/api/ai-mentor/chat` | Send message to AI Mentor Chatbot (injects full mentee context) | Bearer Token |
 
 ---
 
-### 🔒 9. Encrypted Document Vault (`/api/vault`)
+### 🔒 10. Encrypted Document Vault (`/api/vault`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `GET` | `/api/vault` | List all uploaded documents in encrypted vault | Bearer Token |
@@ -237,7 +253,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 🎯 10. Daily Drills & Micro-Learning (`/api/daily-drills`)
+### 🎯 11. Daily Drills & Micro-Learning (`/api/daily-drills`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `GET` | `/api/daily-drills/generate` | Generate daily micro-learning drill question | Bearer Token |
@@ -247,7 +263,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 🎫 11. Support Ticketing System (`/api/support`)
+### 🎫 12. Support Ticketing System (`/api/support`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `GET` | `/api/support/my-tickets` | List user's support tickets | Bearer Token |
@@ -256,7 +272,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 🛠️ 12. Admin Management Portal (`/api/admin`)
+### 🛠️ 13. Admin Management Portal (`/api/admin`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `GET` | `/api/admin/dashboard/stats` | Get overall system statistics (users, revenue, sessions) | Admin Scope |
@@ -279,7 +295,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ---
 
-### 💳 13. Public Payment Webhook (`/api`)
+### 💳 14. Public Payment Webhook (`/api`)
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | `POST` | `/api/midtrans/webhook` | Midtrans Payment Gateway notification callback | Public |
