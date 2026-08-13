@@ -237,12 +237,12 @@ class MentorPortalController extends Controller
                 ] : null,
                 'milestones_progress' => $mentee->milestones->map(function ($m) {
                     return [
-                        'milestone_id' => $m->id,
-                        'parent_id' => $m->parent_id, 
-                        'task_name' => $m->task_name,
-                        'description' => $m->description,
-                        'status' => $m->status,
-                        'target_deadline' => $m->target_deadline,
+                        'milestone_id'    => $m->id,
+                        'parent_id'       => $m->parent_id, 
+                        'task_name'       => $m->task_name,
+                        'description'     => $m->description,
+                        'status'          => $m->status,
+                        'target_date'     => $m->target_date ?? $m->target_deadline,
                     ];
                 }),
                 'document_vault_pre_read' => $mentee->documents->map(function ($doc) {

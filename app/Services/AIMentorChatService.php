@@ -104,8 +104,8 @@ class AIMentorChatService
 
         if ($geminiApiKey) {
             try {
-                // Endpoint Google Gemini API (v1beta gemini-1.5-flash)
-                $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . trim($geminiApiKey);
+                // Endpoint Google Gemini API (v1beta gemini-2.5-flash)
+                $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . trim($geminiApiKey);
 
                 $payload = [
                     'contents' => [
