@@ -222,14 +222,26 @@ class DailyDrillController extends Controller
     public function history()
     {
         $user = Auth::user();
-        $history = DailyDrill::where('user_id', $user->id)
+        $history = DailyDrill::with(['answers.question', 'answers.selectedOption'])
+                             ->where('user_id', $user->id)
                              ->orderBy('created_at', 'desc')
                              ->get();
+
+        $totalDrills = $history->count();
+        $totalXp = (int) $history->sum('xp_earned');
+        $avgScore = $totalDrills > 0 ? round($history->avg('total_score'), 1) : 0;
 
         return response()->json([
             'status' => 'success',
             'message' => 'User drill history retrieved successfully.',
-            'data' => $history
+            'data' => [
+                'summary_statistics' => [
+                    'total_drills_completed' => $totalDrills,
+                    'total_xp_earned' => $totalXp,
+                    'average_score' => $avgScore,
+                ],
+                'history' => $history
+            ]
         ], 200);
     }
 
